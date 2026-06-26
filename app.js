@@ -414,7 +414,7 @@ window.downloadMasterReport = async () => {
         const cats = visibleCategories();
         const userData = [];
         const weekMap = new Map();
-        const eligibleDocs = usersSnap.docs.filter(d => cats.includes(d.data().level||'Coordinators'));
+        const eligibleDocs = usersSnap.docs.filter(d => { const dd = d.data(); return dd.role !== 'superAdmin' && cats.includes(dd.level||'Coordinators'); });
         const allMasterSnaps = await Promise.all(eligibleDocs.map(d => d.ref.collection('sadhana').get()));
         eligibleDocs.forEach((uDoc, idx) => {
             const u = uDoc.data();
@@ -484,7 +484,7 @@ window.downloadCategoryExcel = async (category) => {
     try {
         const usersSnap = await db.collection('users').get();
         const catUsers = usersSnap.docs
-            .filter(d => (d.data().level || 'Coordinators') === category)
+            .filter(d => { const dd = d.data(); return dd.role !== 'superAdmin' && (dd.level || 'Coordinators') === category; })
             .sort((a, b) => (a.data().name || '').localeCompare(b.data().name || ''));
 
         if (!catUsers.length) { alert('No users found in ' + catLabel); return; }
@@ -783,7 +783,7 @@ async function loadUserWCR() {
     // Normal users (non-admin) see their own level's data to enable competition
     const levelFilter = cats.length > 0 ? cats : [userProfile.level || 'Coordinators'];
     const filtered  = usersSnap.docs
-        .filter(doc => levelFilter.includes(doc.data().level||'Coordinators'))
+        .filter(doc => { const d = doc.data(); return d.role !== 'superAdmin' && levelFilter.includes(d.level||'Coordinators'); })
         .sort((a,b) => (a.data().name||'').localeCompare(b.data().name||''));
 
     const weeks = [];
@@ -1947,7 +1947,7 @@ async function loadAdminPanel() {
     const usersSnap = await db.collection('users').get();
     const cats      = visibleCategories();
     const filtered  = usersSnap.docs
-        .filter(doc => cats.includes(doc.data().level||'Coordinators'))
+        .filter(doc => { const d = doc.data(); return d.role !== 'superAdmin' && cats.includes(d.level||'Coordinators'); })
         .sort((a,b) => (a.data().name||'').localeCompare(b.data().name||''));
 
     const pctStyle = (pct) => {
@@ -3305,7 +3305,7 @@ window.loadLeaderboard = async (force) => {
             levelFilter = [userProfile.level || 'Coordinators'];
         }
 
-        const filtered = usersSnap.docs.filter(doc => levelFilter.includes(doc.data().level || 'Coordinators'));
+        const filtered = usersSnap.docs.filter(doc => { const d = doc.data(); return d.role !== 'superAdmin' && levelFilter.includes(d.level || 'Coordinators'); });
         const rows = [];
         let dateDisp = '';
 
