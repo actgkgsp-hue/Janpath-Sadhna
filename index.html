@@ -1,0 +1,2413 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Sadhna Tracker</title>
+    <!-- PWA -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#1A3C5E">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Sadhna">
+    
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <style>
+        :root {
+            --primary:     #1e3a5f;
+            --primary-mid: #2563ab;
+            --accent:      #3b82f6;
+            --accent-light:#dbeafe;
+            --secondary:   #3b82f6;
+            --success:     #059669;
+            --danger:      #dc2626;
+            --warning:     #d97706;
+            --surface:     #ffffff;
+            --bg:          #f0f4f9;
+            --border:      #e2e8f0;
+            --text:        #1e293b;
+            --text-2:      #475569;
+            --text-3:      #94a3b8;
+            --light:       #f0f4f9;
+            --white:       #ffffff;
+            --muted:       #64748b;
+            --r-sm: 8px; --r-md: 12px; --r-lg: 16px; --r-xl: 20px;
+            --shadow-sm: 0 1px 4px rgba(0,0,0,0.05);
+            --shadow-md: 0 4px 16px rgba(0,0,0,0.07);
+            --shadow-lg: 0 8px 32px rgba(0,0,0,0.10);
+        }
+        *, *::before, *::after { box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            background: linear-gradient(160deg, #eef2f9 0%, #f0f4f9 100%);
+            min-height: 100vh; margin: 0; padding: 0;
+            color: var(--text); -webkit-font-smoothing: antialiased;
+        }
+        .container { max-width: 720px; margin: 0 auto; padding: 12px 14px 40px; }
+        @media (min-width: 768px) { .container { max-width: 900px; padding: 16px 28px 40px; } }
+        @media (min-width: 1024px) { .container { max-width: 1100px; padding: 20px 40px 40px; } }
+        .hidden { display: none !important; }
+        .card {
+            background: var(--surface); padding: 20px 22px;
+            border-radius: var(--r-lg);
+            box-shadow: var(--shadow-md);
+            margin-bottom: 14px;
+            border: 1px solid var(--border);
+        }
+
+        /* Inputs */
+        input, select {
+            width: 100%; padding: 12px 14px; margin: 4px 0;
+            border: 1.5px solid var(--border); border-radius: var(--r-md);
+            font-size: 14px; font-family: inherit;
+            background: #fafcff; color: var(--text);
+            transition: border-color 0.18s, box-shadow 0.18s;
+            -webkit-appearance: none; appearance: none;
+        }
+        input:focus, select:focus {
+            outline: none; border-color: var(--accent);
+            box-shadow: 0 0 0 3px rgba(59,130,246,0.12);
+            background: white;
+        }
+        .form-label {
+            font-weight: 600; font-size: 12.5px; color: var(--text-2);
+            margin: 14px 0 3px; display: block; letter-spacing: 0.02em;
+        }
+
+        /* Buttons */
+        button {
+            width: 100%; padding: 12px; margin: 4px 0;
+            border: none; border-radius: var(--r-md);
+            font-size: 14px; font-weight: 600; font-family: inherit;
+            cursor: pointer; transition: all 0.18s; letter-spacing: 0.01em;
+        }
+        button:hover:not(:disabled) { opacity: 0.88; transform: translateY(-1px); }
+        button:active:not(:disabled) { transform: translateY(0); }
+        button:disabled { opacity: 0.45; cursor: not-allowed; transform: none; }
+        .btn-primary { background: var(--primary); color: white; }
+        .btn-success { background: var(--success); color: white; }
+        .btn-danger  { background: var(--danger);  color: white; }
+        .btn-gray    { background: #e2e8f0; color: var(--text-2); }
+        .btn-warning { background: var(--warning); color: white; }
+        .btn-purple  { background: #7c3aed; color: white; }
+        .btn-teal    { background: #0d9488; color: white; }
+        .btn-sm      { width: auto !important; padding: 6px 14px !important; font-size: 12px !important; margin: 2px !important; }
+        .btn-admin-header { width: auto; padding: 6px 14px; font-size: 12px; font-weight: 700; margin: 2px;
+            background: var(--primary); color: white; border-radius: var(--r-sm); white-space: nowrap; border: none; cursor: pointer; }
+        .btn-admin-header:hover { opacity: 0.88; transform: none; }
+        .btn-notif-bell { width: auto; padding: 6px 10px; font-size: 16px; margin: 2px;
+            background: transparent; color: var(--primary); border-radius: var(--r-sm); border: 1.5px solid var(--primary); cursor: pointer; }
+        .btn-notif-bell:hover { background: #f0f4f9; transform: none; }
+        .btn-notif-bell.granted { color: var(--success); border-color: var(--success); }
+
+        /* ── HEADER ── */
+        .app-header {
+            display: flex; align-items: center; gap: 10px;
+            padding: 12px 16px; margin-bottom: 12px;
+            background: white; border-radius: var(--r-lg);
+            box-shadow: var(--shadow-md); border: 1px solid var(--border);
+        }
+        .header-name { font-weight: 700; font-size: 15px; color: var(--primary); }
+        .header-role { font-size: 11px; color: var(--text-3); margin-top: 1px; }
+        .header-btns { display: flex; gap: 6px; flex-wrap: wrap; margin-left: auto; }
+
+        /* ── HAMBURGER ── */
+        .user-menu-btn {
+            width: 38px; height: 38px; min-width: 38px;
+            background: #f0f4f9; border: none; border-radius: var(--r-sm);
+            font-size: 18px; cursor: pointer; display: flex;
+            align-items: center; justify-content: center;
+            margin: 0; padding: 0; flex-shrink: 0;
+            color: var(--primary); transition: background 0.2s;
+        }
+        .user-menu-btn:hover { background: #e2eaf4; transform: none; }
+
+        /* ── ADMIN BTN ── */
+        .admin-corner-btn {
+            width: 38px; height: 38px; min-width: 38px;
+            background: var(--primary); border: none; border-radius: var(--r-sm);
+            font-size: 16px; cursor: pointer; display: flex;
+            align-items: center; justify-content: center;
+            margin: 0; padding: 0; flex-shrink: 0;
+            color: white; transition: background 0.2s;
+        }
+        .admin-corner-btn:hover { background: var(--primary-mid); transform: none; }
+
+        /* ── USER SIDEBAR (left) ── */
+        .user-sidebar {
+            position: fixed; top: 0; left: -300px; width: 280px; height: 100vh;
+            background: white; z-index: 1001;
+            box-shadow: 4px 0 24px rgba(0,0,0,0.15);
+            transition: left 0.28s cubic-bezier(.4,0,.2,1);
+            display: flex; flex-direction: column; overflow-y: auto;
+        }
+        .user-sidebar.open { left: 0; }
+        .user-sidebar-header {
+            background: linear-gradient(135deg, #1A3C5E 0%, #2563a0 100%);
+            padding: 24px 18px 18px; color: white;
+        }
+        .user-sidebar-name { font-size: 16px; font-weight: 700; margin-bottom: 3px; }
+        .user-sidebar-role { font-size: 12px; opacity: 0.8; }
+        .user-sidebar-close {
+            position: absolute; top: 12px; right: 12px;
+            background: rgba(255,255,255,0.2); border: none; border-radius: 6px;
+            color: white; width: 28px; height: 28px; font-size: 16px;
+            cursor: pointer; display: flex; align-items: center; justify-content: center;
+            margin: 0; padding: 0;
+        }
+        .user-sidebar-close:hover { background: rgba(255,255,255,0.35); transform: none; }
+        .sidebar-nav { padding: 10px 0; flex: 1; }
+        .sidebar-item {
+            display: flex; align-items: center; gap: 12px;
+            padding: 13px 20px; cursor: pointer; font-size: 14px;
+            color: #333; transition: background 0.15s; border: none;
+            background: transparent; width: 100%; text-align: left; margin: 0;
+            border-radius: 0;
+        }
+        .sidebar-item:hover { background: #f0f4f8; transform: none; }
+        .sidebar-item-icon { font-size: 18px; width: 24px; text-align: center; flex-shrink: 0; }
+        .sidebar-item-label { font-weight: 500; }
+        .sidebar-item-badge {
+            margin-left: auto; background: #dc2626; color: white;
+            border-radius: 999px; padding: 1px 7px; font-size: 11px; font-weight: 700;
+        }
+        .sidebar-divider { height: 1px; background: #f0f0f0; margin: 6px 16px; }
+        .sidebar-logout {
+            margin: 10px 16px 16px;
+            background: #fee2e2; color: #dc2626; border: none;
+            border-radius: 9px; padding: 11px; font-size: 14px;
+            font-weight: 600; cursor: pointer; width: calc(100% - 32px);
+        }
+        .sidebar-logout:hover { background: #fecaca; transform: none; }
+
+        /* ── SIDEBAR OVERLAY ── */
+        .sidebar-overlay {
+            position: fixed; inset: 0; background: rgba(0,0,0,0.45);
+            z-index: 1000; opacity: 0; pointer-events: none;
+            transition: opacity 0.28s; backdrop-filter: blur(3px);
+        }
+        .sidebar-overlay.open { opacity: 1; pointer-events: all; }
+
+        /* ── GITA BANNER ── */
+        .gita-banner {
+            position: relative; border-radius: 16px; overflow: hidden;
+            margin-bottom: 16px; min-height: 120px;
+            display: flex; align-items: center;
+            pointer-events: none;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.10);
+        }
+        .gita-banner-bg {
+            position: absolute; inset: 0;
+            background: linear-gradient(135deg, rgba(255,248,230,0.92) 0%, rgba(240,235,255,0.92) 100%);
+            z-index: 1;
+            pointer-events: none;
+        }
+       .gita-banner-img {
+            position: absolute; inset: 0; object-fit: cover;object-position: center 40%;
+            width: 100%; height: 100%; z-index: 0;
+            opacity: 1.00; filter: blur(0.005px);
+            pointer-events: none;
+        }
+        .gita-banner-content {
+            position: relative; z-index: 2; padding: 16px 20px;
+            text-align: center; width: 100%;
+            pointer-events: none;
+        }
+        .gita-shloka {
+            font-size: 13.5px; font-weight: 800; letter-spacing: 0.2px;
+            line-height: 1.7; margin-bottom: 7px;
+            color: #1a1a2e;
+        }
+        .gita-translation {
+            font-size: 12px; line-height: 1.6; color: #2d2d2d;
+            max-width: 600px; margin: 0 auto; font-weight: 500;
+        }
+        .gita-ref {
+            font-size: 11px; color: #7c3aed; margin-top: 6px; font-weight: 700;
+            letter-spacing: 0.5px;
+        }
+
+        /* ── USER GUIDE MODAL ── */
+        .guide-section { margin-bottom: 20px; }
+        .guide-section h3 { font-size: 14px; font-weight: 700; color: #1A3C5E; margin-bottom: 8px; padding-bottom: 4px; border-bottom: 2px solid #e0e7ff; }
+        .guide-row { display: flex; gap: 8px; margin-bottom: 6px; font-size: 13px; }
+        .guide-icon { font-size: 16px; flex-shrink: 0; margin-top: 1px; }
+        .score-table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 8px; }
+        .score-table th { background: #1A3C5E; color: white; padding: 7px 10px; text-align: left; }
+        .score-table td { padding: 7px 10px; border-bottom: 1px solid #f0f0f0; }
+        .score-table tr:nth-child(even) td { background: #f9fafb; }
+        .score-pos { color: #16a34a; font-weight: 700; }
+        .score-neg { color: #dc2626; font-weight: 700; }
+
+        /* ── NAV TABS ── */
+        .nav-tabs {
+            display: flex; gap: 4px; margin-bottom: 16px;
+            overflow-x: auto; flex-wrap: nowrap;
+            -webkit-overflow-scrolling: touch; scrollbar-width: none;
+            padding: 5px 5px 5px;
+            background: rgba(30,58,95,0.06);
+            border-radius: var(--r-xl);
+        }
+        .nav-tabs::-webkit-scrollbar { display: none; }
+        .tab-btn {
+            background: transparent; color: var(--text-3);
+            padding: 8px 16px; border-radius: var(--r-xl);
+            width: auto; font-size: 13px; margin: 0;
+            white-space: nowrap; flex-shrink: 0;
+            font-weight: 600; transition: all 0.2s;
+        }
+        .tab-btn.active {
+            background: white; color: var(--primary);
+            box-shadow: 0 2px 8px rgba(30,58,95,0.12);
+        }
+
+        /* Tab panels */
+        .tab-panel { display: none; }
+        .tab-panel.active { display: block; }
+
+        /* Week cards */
+        .week-card { background: white; margin-bottom: 10px; border-radius: 10px; border-left: 4px solid var(--secondary); box-shadow: 0 1px 6px rgba(0,0,0,0.06); overflow: hidden; }
+        .week-header { padding: 13px 16px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; font-weight: 600; font-size: 14px; user-select: none; gap: 10px; flex-wrap: nowrap; }
+        .week-header:hover { background: #f9fafb; }
+        .week-body { padding: 10px 14px; border-top: 1px solid #f0f0f0; overflow-x: auto; overflow-y: auto; max-height: 420px; display: none; }
+        .week-body.open { display: block; }
+
+        /* Tables */
+        .data-table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 12px; }
+        .data-table th, .data-table td { border: 1px solid #e0e0e0; padding: 7px 9px; text-align: center; white-space: nowrap; }
+        .data-table th { background: #f8f9fa; font-weight: 600; font-size: 11px;
+            position: sticky; top: 0; z-index: 3; }
+        .data-table td:first-child { text-align: left; font-weight: 500;
+            position: sticky; left: 0; z-index: 2; background: white; min-width: 34px; }
+        .data-table th:first-child { position: sticky; left: 0; top: 0; z-index: 4; background: #f8f9fa; min-width: 34px; }
+        .data-table td:nth-child(2) { position: sticky; left: 34px; z-index: 2; background: white; font-weight: 600; }
+        .data-table th:nth-child(2) { position: sticky; left: 34px; top: 0; z-index: 4; background: #f8f9fa; }
+
+        /* ── MODALS ── */
+        .modal-overlay {
+            position: fixed; inset: 0; background: rgba(15,23,42,0.72);
+            display: flex; justify-content: center; align-items: center;
+            z-index: 999; padding: 16px; backdrop-filter: blur(4px);
+        }
+        .modal-box {
+            background: white; width: 100%; max-width: 900px; padding: 24px;
+            border-radius: var(--r-xl); max-height: 92vh; overflow-y: auto;
+            position: relative; box-shadow: var(--shadow-lg);
+        }
+        .modal-box.sm { max-width: 420px; }
+        .modal-box.md { max-width: 540px; }
+        .modal-close {
+            position: absolute; right: 14px; top: 14px; font-size: 16px;
+            cursor: pointer; color: var(--text-3); background: #f0f4f9;
+            border: none; width: 30px; height: 30px; border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            padding: 0; margin: 0; line-height: 1; transition: all 0.15s;
+        }
+        .modal-close:hover { color: var(--primary); background: #e2e8f0; transform: none; }
+        .modal-title { font-size: 17px; font-weight: 700; color: var(--primary); margin: 0 0 18px; padding-right: 38px; }
+
+        /* Admin user cards */
+        .user-card { border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; margin-bottom: 8px; background: white; }
+        .user-card-top { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin-bottom: 4px; }
+        .user-name  { font-weight: 700; font-size: 15px; }
+        .user-meta  { font-size: 12px; color: var(--muted); margin-top: 3px; }
+        .user-actions { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin-top: 10px; }
+        .role-badge { display: inline-block; padding: 2px 9px; border-radius: 10px; font-size: 11px; font-weight: 600; margin-left: 6px; vertical-align: middle; }
+
+        /* Info banner */
+        .info-banner { padding: 9px 14px; border-radius: 8px; margin-bottom: 12px; font-size: 13px; }
+        .banner-purple { background: #f3e8ff; color: #6d28d9; }
+        .banner-blue   { background: #eff6ff; color: #1d4ed8; }
+
+        /* ── CHART TABS ── */
+        .chart-tabs { display: flex; gap: 6px; margin-bottom: 14px; flex-wrap: wrap; }
+        .chart-tab-btn {
+            background: #f0f4f9; color: var(--text-2);
+            padding: 7px 18px; border-radius: var(--r-xl);
+            width: auto; font-size: 13px; margin: 0; font-weight: 500;
+            transition: all 0.18s;
+        }
+        .chart-tab-btn.active {
+            background: var(--primary); color: white;
+            box-shadow: 0 2px 8px rgba(30,58,95,0.2);
+        }
+        .chart-container { position: relative; height: 260px; }
+
+        /* Password modal */
+        .pwd-field-group { margin-bottom: 14px; }
+        .pwd-field-group label { font-weight: 600; font-size: 13px; color: #444; display: block; margin-bottom: 4px; }
+
+        /* Section divider in profile */
+        hr.section-hr { border: none; border-top: 1px dashed #e0e0e0; margin: 20px 0; }
+
+        /* ── REPORTS PANEL — bigger font ── */
+        #weekly-reports-container .data-table,
+        #modal-report-container .data-table {
+            font-size: 13px;
+        }
+        #weekly-reports-container .data-table th,
+        #modal-report-container .data-table th {
+            font-size: 12px;
+            padding: 8px 10px;
+        }
+        #weekly-reports-container .data-table td,
+        #modal-report-container .data-table td {
+            padding: 8px 10px;
+        }
+        .week-header {
+            font-size: 14px;
+            padding: 13px 16px;
+        }
+
+        /* ── COMPARATIVE PERFORMANCE TABLE ── */
+        .comp-table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0;
+            font-size: 14px;
+        }
+        .comp-th {
+            position: sticky;
+            top: 0;
+            z-index: 3;
+            background: #1A3C5E;
+            color: white;
+            font-weight: 700;
+            font-size: 12px;
+            padding: 10px 12px;
+            text-align: center;
+            border-bottom: 2px solid #2563a0;
+            white-space: nowrap;
+        }
+        .comp-th-name {
+            text-align: left;
+            min-width: 140px;
+            position: sticky;
+            left: 0;
+            z-index: 5;
+            background: #1A3C5E;
+        }
+        .comp-td {
+            padding: 9px 12px;
+            border-bottom: 1px solid #e5e7eb;
+            text-align: center;
+            white-space: nowrap;
+            font-size: 13px;
+            transition: background 0.3s, box-shadow 0.3s;
+        }
+        .comp-th.col-highlight { background: #2563ab !important; box-shadow: inset 0 -3px 0 #fbbf24; }
+        .comp-td.col-highlight { background: #eff6ff !important; box-shadow: inset 2px 0 0 #3b82f6, inset -2px 0 0 #3b82f6; }
+        @keyframes colPulse { 0%,100% { opacity:1; } 50% { opacity:0.7; } }
+        .col-highlight { animation: colPulse 0.8s ease-in-out 2; }
+        .comp-name {
+            text-align: left;
+            font-weight: 700;
+            font-size: 14px;
+            position: sticky;
+            left: 0;
+            z-index: 2;
+            background: white;
+        }
+        .comp-meta {
+            font-size: 12px;
+            color: #6b7280;
+            text-align: left;
+        }
+        .comp-pct {
+            font-size: 14px;
+            min-width: 80px;
+        }
+
+        /* ── EDIT HISTORY MODAL — rich HTML styling ── */
+        .eh-entry {
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            margin-bottom: 14px;
+            overflow: hidden;
+        }
+        .eh-header {
+            background: #1A3C5E;
+            color: white;
+            padding: 9px 14px;
+            font-size: 13px;
+            font-weight: 600;
+        }
+        .eh-who  { color: #93c5fd; }
+        .eh-when { color: #d1d5db; font-size: 12px; }
+        .eh-reason {
+            background: #f8fafc;
+            padding: 7px 14px;
+            font-size: 12px;
+            color: #6b7280;
+            border-bottom: 1px solid #e5e7eb;
+        }
+        .eh-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+        }
+        .eh-table th {
+            background: #f1f5f9;
+            padding: 7px 12px;
+            text-align: left;
+            font-weight: 600;
+            font-size: 12px;
+            color: #374151;
+            border-bottom: 1px solid #e5e7eb;
+        }
+        .eh-table td { padding: 7px 12px; border-bottom: 1px solid #f0f0f0; }
+        .eh-field  { font-weight: 600; color: #374151; width: 35%; }
+        .eh-before { color: #b91c1c; background: #fff5f5; }
+        .eh-after  { color: #15803d; background: #f0fdf4; font-weight: 600; }
+        .eh-nochange {
+            padding: 10px 14px;
+            font-size: 12px;
+            color: #9ca3af;
+            font-style: italic;
+        }
+        /* Edit history modal content area — scrollable, no monospace */
+        #edit-history-content {
+            font-family: inherit;
+            font-size: 13px;
+            line-height: 1.5;
+        }
+
+        .admin-menu-float { display: none; }
+
+        /* ── ADMIN DRAWER ── */
+        .drawer-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: 1000;
+            backdrop-filter: blur(2px);
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+        .drawer-overlay:not(.hidden) {
+            pointer-events: all;
+            opacity: 1;
+        }
+
+        .admin-drawer {
+            position: fixed;
+            top: 0;
+            left: -280px;
+            width: 260px;
+            height: 100vh;
+            background: #1A3C5E;
+            z-index: 1001;
+            transition: left 0.28s cubic-bezier(0.4,0,0.2,1);
+            box-shadow: 4px 0 24px rgba(0,0,0,0.25);
+            display: flex;
+            flex-direction: column;
+        }
+        .admin-drawer.open { left: 0; }
+
+        .drawer-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px 18px 16px;
+            border-bottom: 1px solid rgba(255,255,255,0.12);
+            color: white;
+            font-weight: 700;
+            font-size: 15px;
+        }
+        .drawer-close {
+            background: none;
+            border: none;
+            color: rgba(255,255,255,0.7);
+            font-size: 18px;
+            width: auto;
+            padding: 4px 8px;
+            margin: 0;
+            cursor: pointer;
+        }
+        .drawer-close:hover { color: white; transform: none; opacity: 1; }
+
+        .drawer-nav {
+            padding: 12px 10px;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        .drawer-nav-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 13px 14px;
+            border-radius: 10px;
+            background: transparent;
+            color: rgba(255,255,255,0.75);
+            font-size: 14px;
+            font-weight: 600;
+            text-align: left;
+            width: 100%;
+            margin: 0;
+            transition: all 0.15s;
+            border: none;
+            cursor: pointer;
+        }
+        .drawer-nav-item:hover { background: rgba(255,255,255,0.1); color: white; transform: none; }
+        .drawer-nav-item.active { background: rgba(255,255,255,0.18); color: white; }
+        .drawer-icon { font-size: 18px; flex-shrink: 0; }
+
+        .admin-sub-panel { display: none; }
+        .admin-sub-panel.active { display: block; }
+
+        .inactive-tab-count {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            background: #dc2626;
+            color: white;
+            border-radius: 999px;
+            min-width: 20px;
+            height: 20px;
+            padding: 0 6px;
+            font-size: 11px;
+            font-weight: 700;
+            margin-left: auto;
+        }
+        .inactive-tab-count:empty { display: none; }
+
+        /* ── ADMIN SEARCH BAR ── */
+        .admin-search-bar {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 14px;
+            flex-wrap: wrap;
+        }
+
+        /* ── INACTIVE FILTER BUTTONS ── */
+        .inactive-filter-bar {
+            display: flex;
+            gap: 8px;
+            padding: 12px 16px;
+            background: #fff7ed;
+            border-bottom: 1px solid #fca5a5;
+            flex-wrap: nowrap;
+        }
+        .inactive-filter-btn {
+            flex: 1;
+            padding: 7px 10px;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 600;
+            background: #f1f5f9;
+            color: #555;
+            border: none;
+            cursor: pointer;
+            width: auto;
+            margin: 0;
+            transition: all 0.15s;
+        }
+        .inactive-filter-btn:hover { background: #e2e8f0; transform: none; }
+        .inactive-filter-btn.active { background: #b91c1c; color: white; }
+
+        /* ── INACTIVE DEVOTEES SECTION ── */
+        .admin-tabs {
+            display: flex;
+            gap: 6px;
+            margin-bottom: 16px;
+            background: white;
+            padding: 8px;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+            overflow-x: auto;
+            flex-wrap: nowrap;
+            scrollbar-width: none;
+        }
+        .admin-tabs::-webkit-scrollbar { display: none; }
+        .admin-tab-item {
+            flex-shrink: 0;
+            background: #f1f5f9;
+            color: #555;
+            border: none;
+            padding: 9px 18px;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.18s;
+            width: auto;
+            margin: 0;
+            white-space: nowrap;
+        }
+        .admin-tab-item:hover:not(.active) { background: #e2e8f0; transform: none; }
+        .admin-tab-item.active { background: #1A3C5E; color: white; }
+        .admin-sub-panel { display: none; }
+        .admin-sub-panel.active { display: block; }
+        .inactive-tab-count {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            background: #dc2626;
+            color: white;
+            border-radius: 999px;
+            min-width: 18px;
+            height: 18px;
+            padding: 0 5px;
+            font-size: 11px;
+            font-weight: 700;
+            margin-left: 5px;
+            vertical-align: middle;
+        }
+        .inactive-tab-count:empty { display: none; }
+
+        /* ── ADMIN SEARCH BAR ── */
+        .admin-search-bar {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 14px;
+            flex-wrap: wrap;
+        }
+
+        /* ── INACTIVE FILTER BUTTONS ── */
+        .inactive-filter-bar {
+            display: flex;
+            gap: 8px;
+            padding: 12px 16px;
+            background: #fff7ed;
+            border-bottom: 1px solid #fca5a5;
+            flex-wrap: nowrap;
+        }
+        .inactive-filter-btn {
+            flex: 1;
+            padding: 7px 10px;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 600;
+            background: #f1f5f9;
+            color: #555;
+            border: none;
+            cursor: pointer;
+            width: auto;
+            margin: 0;
+            transition: all 0.15s;
+        }
+        .inactive-filter-btn:hover { background: #e2e8f0; transform: none; }
+        .inactive-filter-btn.active { background: #b91c1c; color: white; }
+
+        /* ── INACTIVE DEVOTEES SECTION ── */
+        .inactive-section {
+            border: 1px solid #fca5a5;
+            border-radius: 10px;
+            margin-bottom: 16px;
+            overflow: hidden;
+            background: white;
+        }
+        .inactive-header {
+            padding: 12px 16px;
+            background: #fff7ed;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-weight: 700;
+            font-size: 14px;
+            color: #b91c1c;
+            user-select: none;
+            border-bottom: 1px solid #fca5a5;
+        }
+        .inactive-header:hover { background: #fff1e0; }
+        .inactive-badge {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            background: #dc2626;
+            color: white;
+            border-radius: 999px;
+            min-width: 22px;
+            height: 22px;
+            padding: 0 7px;
+            font-size: 12px;
+            font-weight: 700;
+            margin-left: 7px;
+            vertical-align: middle;
+        }
+        .inactive-badge-zero {
+            background: #16a34a;
+        }
+        .inactive-arrow {
+            font-size: 11px;
+            color: #b91c1c;
+            transition: transform 0.2s;
+        }
+        .inactive-section.open .inactive-arrow {
+            transform: rotate(180deg);
+        }
+        .inactive-body {
+            display: block;
+            padding: 8px 0;
+        }
+        .inactive-empty {
+            padding: 14px 16px;
+            color: #16a34a;
+            font-size: 13px;
+            font-weight: 600;
+            text-align: center;
+        }
+        .inactive-card {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 16px;
+            border-bottom: 1px solid #f3f4f6;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+        .inactive-card:last-child { border-bottom: none; }
+        .inactive-card-left {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .inactive-dot { font-size: 13px; }
+        .inactive-name {
+            font-weight: 700;
+            font-size: 14px;
+            color: #1a252f;
+        }
+        .inactive-meta {
+            font-size: 12px;
+            color: #6b7280;
+            margin-top: 2px;
+        }
+        .inactive-actions {
+            display: flex;
+            gap: 6px;
+        }
+
+        /* Sticky first two columns — shadow separator on Date column */
+        .data-table tr td:first-child { background: inherit; }
+        .data-table tr td:nth-child(2) {
+            background: inherit;
+            box-shadow: 3px 0 6px rgba(0,0,0,0.12);
+            clip-path: inset(0px -8px 0px 0px);
+        }
+        .data-table thead th:first-child { background: #f8f9fa; }
+        .data-table thead th:nth-child(2) {
+            background: #f8f9fa;
+            box-shadow: 3px 0 6px rgba(0,0,0,0.15);
+            clip-path: inset(0px -8px 0px 0px);
+        }
+
+        /* ── EDIT BUTTON in table rows ── */
+        .btn-edit-cell {
+            width: auto !important; padding: 3px 9px !important; font-size: 11px !important;
+            margin: 0 !important; background: #f39c12 !important; color: white !important;
+            border-radius: 5px !important; font-weight: 600 !important;
+        }
+        .btn-edit-cell:hover { background: #d68910 !important; }
+
+        /* ── EDITED BADGE (✏️ indicator) ── */
+        .edited-badge {
+            display: inline-block; cursor: pointer; font-size: 11px;
+            margin-left: 4px; vertical-align: middle;
+            opacity: 0.75; transition: opacity 0.15s;
+        }
+        .edited-badge:hover { opacity: 1; }
+
+        /* ── REJECTED BADGE (🚫 indicator) ── */
+        .rejected-badge {
+            display: inline-block; cursor: default; font-size: 11px;
+            margin-left: 4px; vertical-align: middle;
+        }
+
+        /* ── TIME HINT (AM/PM preview under time inputs) ── */
+        .time-hint {
+            font-size: 12px; font-weight: 700; color: #1A3C5E;
+            margin-top: 3px; min-height: 16px; letter-spacing: 0.02em;
+        }
+
+        /* ── PASS / FAIL BADGE ── */
+        .pf-badge {
+            display: inline-block; font-size: 10px; font-weight: 700;
+            padding: 2px 6px; border-radius: 10px; white-space: nowrap;
+        }
+        .pf-pass { background: #dcfce7; color: #15803d; }
+        .pf-fail { background: #fee2e2; color: #dc2626; }
+
+        /* ── REJECT / REVOKE BUTTONS in table rows ── */
+        .btn-reject-cell {
+            width: auto !important; padding: 3px 9px !important; font-size: 11px !important;
+            margin: 0 !important; background: #dc2626 !important; color: white !important;
+            border-radius: 5px !important; font-weight: 600 !important;
+        }
+        .btn-reject-cell:hover { background: #b91c1c !important; }
+        .btn-revoke-cell {
+            width: auto !important; padding: 3px 9px !important; font-size: 11px !important;
+            margin: 0 !important; background: #d97706 !important; color: white !important;
+            border-radius: 5px !important; font-weight: 600 !important;
+        }
+        .btn-revoke-cell:hover { background: #b45309 !important; }
+
+        /* ── EDIT SADHANA MODAL fields ── */
+        .edit-field-group { margin-bottom: 12px; }
+        .edit-field-group label { font-weight: 600; font-size: 13px; color: #444; display: block; margin-bottom: 3px; }
+        .edit-field-group input { margin: 0; }
+        .edit-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        .edit-score-preview {
+            text-align: center; font-size: 15px; font-weight: 700;
+            padding: 10px; border-radius: 8px; background: #f8f9fa;
+            margin: 14px 0; color: #27ae60;
+        }
+        .edit-reason-group { margin: 12px 0; }
+        .edit-reason-group label { font-weight: 600; font-size: 13px; color: #444; display: block; margin-bottom: 4px; }
+        .edit-reason-group textarea {
+            width: 100%; padding: 9px 12px; border: 1px solid #ddd; border-radius: 8px;
+            font-size: 13px; resize: vertical; min-height: 60px; font-family: inherit;
+        }
+
+
+        /* ── SA level filter buttons ── */
+        .sa-lvl-bar { display:flex; }
+        .sa-lvl-btn {
+            width:auto; padding:5px 14px; font-size:12px; font-weight:600;
+            border-radius:20px; border:1.5px solid #ddd; background:white;
+            color:#555; cursor:pointer; margin:0; transition:all 0.15s;
+        }
+        .sa-lvl-btn.active { background:#1A3C5E; color:white; border-color:#1A3C5E; }
+
+        /* ── User list item (Individual Reports) ── */
+        .user-list-item {
+            display:flex; align-items:center; justify-content:space-between;
+            padding:13px 16px; cursor:pointer; border-bottom:1px solid #f0f0f0;
+            -webkit-tap-highlight-color:transparent;
+        }
+        .user-list-item:active { background:#f4f7f6; }
+        .user-list-name { font-weight:700; font-size:14px; color:#1a252f; }
+        .sa-user-meta  { font-size:12px; color:#888; margin-top:2px; }
+        .user-list-chevron { font-size:22px; color:#ccc; flex-shrink:0; }
+
+        /* ── User Action Bottom Sheet ── */
+        .uac-overlay {
+            position:fixed; inset:0; background:rgba(0,0,0,0.45); z-index:1100;
+        }
+        .uac-sheet {
+            position:fixed; bottom:-100%; left:0; right:0; max-width:600px; margin:0 auto;
+            background:white; border-radius:20px 20px 0 0; z-index:1101;
+            transition:bottom 0.3s ease; max-height:85vh; overflow-y:auto;
+            box-shadow:0 -4px 30px rgba(0,0,0,0.15);
+        }
+        .uac-sheet.open { bottom:0; }
+        .uac-handle { width:36px; height:4px; background:#e0e0e0; border-radius:2px; margin:12px auto 4px; }
+        .uac-head {
+            padding:12px 20px 14px; border-bottom:1px solid #f0f0f0;
+            display:flex; justify-content:space-between; align-items:flex-start;
+        }
+        .uac-hname { font-size:17px; font-weight:800; color:#1a252f; }
+        .uac-hsub  { font-size:12px; color:#888; margin-top:2px; }
+        .uac-x { background:none; border:none; font-size:22px; color:#aaa; cursor:pointer; width:auto; padding:0; }
+        .uac-body { padding:10px 14px 28px; display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+        .uac-body .uac-fullwidth { grid-column: 1 / -1; }
+        .uac-btn {
+            display:flex; flex-direction:column; align-items:center; gap:8px;
+            padding:14px 8px; border:none; border-radius:12px; background:#f8fafc;
+            font-size:13px; font-weight:600; color:#1a252f; cursor:pointer;
+            text-align:center; border:1px solid var(--border);
+        }
+        .uac-btn:active { background:#f4f7f6; }
+        .uac-ico { width:40px; height:40px; border-radius:10px; display:flex; align-items:center; justify-content:center; font-size:18px; flex-shrink:0; }
+        .uac-btn.danger { color:#dc2626; }
+        .uac-divider { border:none; border-top:1px solid #f0f0f0; margin:8px 0; }
+        .uac-role-label { font-size:11px; font-weight:700; color:#aaa; text-transform:uppercase; letter-spacing:0.5px; margin:8px 0 6px; }
+        .uac-role-sel { width:100%; padding:11px 14px; border:1.5px solid #e5e7eb; border-radius:10px; font-size:14px; background:white; cursor:pointer; margin:0; }
+
+        /* ── Password Eye Toggle ── */
+        .pwd-wrap { position:relative; }
+        .pwd-wrap input { padding-right:42px; }
+        .pwd-eye {
+            position:absolute; right:10px; top:50%; transform:translateY(-50%);
+            background:none; border:none; cursor:pointer; font-size:17px;
+            color:#888; padding:0; margin:0; width:auto; line-height:1;
+            display:flex; align-items:center; justify-content:center;
+        }
+        .pwd-eye:hover { color:#1A3C5E; transform:translateY(-50%); opacity:1; }
+
+        /* ── Performers Circular Chart ── */
+        .perf-rings-svg { width:100%; max-width:180px; display:block; margin:0 auto 10px; }
+        .perf-legend-item {
+            display:flex; align-items:center; gap:8px;
+            padding:5px 0; border-bottom:1px solid #f5f5f5; cursor:default;
+        }
+        .perf-legend-item:last-child { border-bottom:none; }
+        .perf-legend-dot { width:11px; height:11px; border-radius:50%; flex-shrink:0; }
+        .perf-legend-name { font-size:13px; font-weight:700; }
+        .perf-legend-pct  { font-size:13px; font-weight:800; flex-shrink:0; }
+        .perf-legend-act  { font-size:10px; color:#999; }
+        .perf-empty { text-align:center; color:#aaa; font-size:12px; padding:16px 0; }
+        .perf-tab-btn:hover { opacity:0.85; }
+
+        /* ── AVATAR ── */
+        .av { width:36px;height:36px;border-radius:50%;background:#dbeafe;border:2px solid #3498db;
+              display:inline-flex;align-items:center;justify-content:center;overflow:hidden;flex-shrink:0; }
+        .av img { width:100%;height:100%;object-fit:cover;border-radius:50%; }
+        .av-init { font-size:13px;font-weight:700;color:#1A3C5E; }
+        .av-lg { width:64px;height:64px; }
+        .av-lg .av-init { font-size:22px; }
+
+        /* ── LEADERBOARD ── */
+        .lb-row {
+            display:flex; align-items:center; gap:10px;
+            padding:12px 14px; border-radius:var(--r-md);
+            margin-bottom:8px; background:#f8fafd;
+            border:1px solid var(--border); transition:background 0.1s;
+        }
+        .lb-row:hover { background:#f0f6ff; }
+        .lb-row.lb-self { background:#eff6ff; border-color:#bfdbfe; box-shadow:0 0 0 1px #bfdbfe; }
+        .lb-rank { font-size:18px; width:28px; text-align:center; flex-shrink:0; }
+        .lb-name { flex:1; font-weight:600; font-size:13px; color:var(--text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+        .lb-score-wrap { text-align:right; flex-shrink:0; }
+        .lb-score { font-weight:800; font-size:15px; }
+        .lb-pct { font-size:11px; color:var(--text-3); }
+
+        /* ── TASKS ── */
+        .task-card {
+            background:white; border-radius:var(--r-md);
+            border:1px solid var(--border); padding:16px;
+            margin-bottom:10px; box-shadow:var(--shadow-sm);
+            border-left:3px solid var(--accent);
+        }
+        .task-title { font-weight:700; font-size:14px; color:var(--primary); margin-bottom:5px; }
+        .task-body { font-size:13px; color:var(--text-2); margin-bottom:8px; white-space:pre-wrap; line-height:1.55; }
+        .task-meta { font-size:11px; color:var(--text-3); }
+        .task-cat-badge { display:inline-block; padding:2px 8px; border-radius:10px; font-size:11px; font-weight:600; background:#eff6ff; color:#1d4ed8; margin-right:6px; }
+        .task-link { display:inline-block; margin-top:6px; color:var(--accent); font-size:12px; word-break:break-all; }
+        .task-del-btn { float:right; background:none; border:none; color:var(--danger); font-size:18px; cursor:pointer; width:auto; padding:0; margin:0; line-height:1; }
+
+        /* ── ACTIVITY ANALYSIS ── */
+        .aa-donut-wrap { position:relative;width:130px;height:130px;flex-shrink:0; }
+        .aa-donut-label { position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;pointer-events:none; }
+        .aa-donut-pct { font-size:22px;font-weight:800;color:#1A3C5E; }
+        .aa-donut-sub { font-size:10px;color:#9ca3af;margin-top:2px; }
+        .aa-bar-wrap { position:relative;height:220px; }
+        .aa-summary-item { font-size:12px;color:#374151;margin-bottom:6px; }
+        .aa-summary-item strong { color:var(--primary); }
+
+        /* ── AUTH SCREEN ── */
+        #auth-section { max-width:400px; margin:28px auto 0; padding:0; border:none; overflow:hidden; box-shadow:0 8px 40px rgba(30,58,95,0.13); }
+        .auth-hero {
+            background:linear-gradient(160deg, #1e3a5f 0%, #2563ab 60%, #3b82f6 100%);
+            padding:36px 28px 32px; text-align:center; color:white;
+        }
+        .auth-logo { font-size:40px; margin-bottom:12px; display:block; }
+        .auth-title { font-size:22px; font-weight:800; margin:0 0 6px; letter-spacing:0.3px; }
+        .auth-sub { font-size:12.5px; opacity:0.78; font-style:italic; letter-spacing:0.3px; margin:0; }
+        .auth-body { padding:28px 26px 30px; }
+
+        /* ── SADHANA FORM GROUPS ── */
+        .form-section {
+            background:#f8fafd; border-radius:var(--r-md);
+            border:1px solid var(--border); padding:16px; margin-bottom:14px;
+        }
+        .form-section-title {
+            font-size:11px; font-weight:700; color:var(--text-3);
+            text-transform:uppercase; letter-spacing:0.7px;
+            margin:0 0 12px; display:flex; align-items:center; gap:6px;
+        }
+        .field-row-2 { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+        .field-row-3 { display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; }
+        .field-group { margin-bottom:0; }
+        .field-group .form-label { margin-top:0; font-size:11.5px; }
+
+        /* ── UAC SHEET ── */
+        .uac-sheet { box-shadow:0 -8px 40px rgba(0,0,0,0.14); }
+        .uac-hname { color:var(--primary); }
+        .uac-btn:hover { background:#f0f5ff; }
+
+        /* ── USER LIST ── */
+        .user-list-item:hover { background:#f8fafd; }
+        .user-list-chevron { font-size:16px; color:#d1d5db; }
+
+        /* ── WEEK CARDS ── */
+        .week-card { border-radius:var(--r-md); border-color:var(--accent); border:1px solid var(--border); border-left:4px solid var(--accent); }
+        .week-header { background:white; }
+        .week-header:hover { background:#f8fafd; }
+
+        /* ── EDIT SCORE PREVIEW ── */
+        .edit-score-preview { background:#f0fdf4; border:1px solid #bbf7d0; color:var(--success); border-radius:var(--r-md); }
+
+        /* ── ADMIN DRAWER ── */
+        .admin-drawer { background:linear-gradient(180deg, #1e3a5f 0%, #162d4a 100%); }
+
+        /* ── GITA BANNER ── */
+        .gita-shloka { font-size:14px; color:#1a1833; }
+        .gita-translation { font-size:12.5px; }
+
+        /* ── SECTION HEADING STYLE ── */
+        .section-title {
+            font-size:15px; font-weight:700; color:var(--primary);
+            margin:0 0 14px; display:flex; align-items:center; gap:7px;
+        }
+        .section-title span { opacity:0.6; font-size:13px; font-weight:500; }
+
+        /* ── SCORE TAG ── */
+        .score-tag {
+            display:inline-flex; align-items:center; gap:4px;
+            background:var(--accent-light); color:var(--primary);
+            border-radius:var(--r-xl); padding:4px 12px;
+            font-size:12px; font-weight:700;
+        }
+
+        /* ── HEADER ICON BUTTONS ── */
+        .header-icon-btn {
+            width: 36px; height: 36px; min-width: 36px; border: none;
+            border-radius: var(--r-sm); background: #f0f4f9;
+            font-size: 16px; cursor: pointer; display: flex;
+            align-items: center; justify-content: center;
+            position: relative; flex-shrink: 0; padding: 0;
+            color: var(--text-2); transition: background 0.2s;
+        }
+        .header-icon-btn:active { transform: scale(0.95); }
+        .header-logout-btn { background: transparent; color: var(--danger); }
+        .header-badge {
+            position: absolute; top: -3px; right: -3px;
+            background: var(--danger); color: white; font-size: 9px;
+            padding: 1px 5px; border-radius: 99px; font-weight: 700; line-height: 1.3;
+        }
+        /* ── TASK DONE BTN ── */
+        .task-done-btn {
+            padding: 6px 14px; font-size: 12px; font-weight: 700;
+            border-radius: var(--r-md); border: 1.5px solid var(--success);
+            background: white; color: var(--success); cursor: pointer;
+            transition: all 0.2s;
+        }
+        .task-done-btn:active { transform: scale(0.95); }
+        .task-done-btn.completed {
+            background: #dcfce7; color: var(--success);
+            border-color: #bbf7d0; cursor: default;
+        }
+        .task-completion-count {
+            font-size: 11px; color: var(--text-3); margin-top: 4px;
+        }
+        .task-status-section { margin-top: 10px; border-top: 1px solid var(--border); padding-top: 10px; }
+        .task-status-toggle {
+            font-size: 12px; font-weight: 600; color: var(--accent); cursor: pointer;
+            background: none; border: none; padding: 0; display: flex; align-items: center; gap: 4px;
+        }
+        .task-status-detail { margin-top: 8px; display: none; }
+        .task-status-detail.open { display: block; }
+        .task-user-row {
+            display: flex; align-items: center; gap: 6px; padding: 4px 0;
+            font-size: 12px; color: var(--text);
+        }
+        .task-user-row .tud { color: var(--success); font-weight: 600; }
+        .task-user-row .tup { color: var(--text-3); }
+        .task-remind-btn {
+            padding: 5px 12px; font-size: 11px; font-weight: 700;
+            border-radius: var(--r-md); border: 1.5px solid var(--warning);
+            background: #fffbeb; color: var(--warning); cursor: pointer;
+            margin-top: 6px; width: auto;
+        }
+        .task-remind-btn:active { transform: scale(0.95); }
+
+        /* Subtle SA nav tabs */
+        #sa-nav-tabs .tab-btn.sa-tab { font-size:12px; padding:7px 13px; }
+
+        /* ── BOTTOM NAV ── */
+        .bottom-nav {
+            display: none; position: fixed; bottom: 0; left: 0; right: 0;
+            height: 60px;
+            background: #ffffff; border-top: 1px solid var(--border);
+            box-shadow: 0 -2px 12px rgba(0,0,0,0.07); z-index: 200;
+            justify-content: space-around; align-items: stretch;
+            padding-bottom: env(safe-area-inset-bottom);
+        }
+        .bottom-nav.visible { display: flex; }
+        .bnav-item {
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            gap: 2px; flex: 1; padding: 6px 2px; cursor: pointer; border: none; background: none;
+            color: var(--text-3); transition: color 0.2s; font-size: 10px; font-weight: 600;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .bnav-icon { font-size: 20px; line-height: 1; transition: transform 0.25s cubic-bezier(0.34,1.56,0.64,1); display: block; }
+        .bnav-item.active { color: var(--accent); }
+        .bnav-item.active .bnav-icon { transform: translateY(-2px) scale(1.12); }
+        .bnav-item:active .bnav-icon { transform: scale(0.85); }
+        body.has-bottom-nav .container { padding-bottom: 80px; }
+        body.has-bottom-nav #user-nav-tabs,
+        body.has-bottom-nav #sa-nav-tabs { display: none !important; }
+
+        /* ── TAB PANEL ANIMATION ── */
+        @keyframes panelIn {
+            from { opacity: 0; transform: translateY(12px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+        .tab-panel.active { animation: panelIn 0.28s cubic-bezier(0.22,1,0.36,1) both; }
+
+        /* ── MODAL ANIMATION ── */
+        @keyframes modalIn {
+            from { opacity: 0; transform: scale(0.92) translateY(10px); }
+            to   { opacity: 1; transform: scale(1) translateY(0); }
+        }
+        .modal-overlay:not(.hidden) .modal-box { animation: modalIn 0.22s cubic-bezier(0.34,1.56,0.64,1) both; }
+
+        /* ── SUBMIT SUCCESS OVERLAY ── */
+        #submit-success-overlay {
+            display: none; position: fixed; inset: 0; z-index: 1000;
+            background: rgba(30,58,95,0.6); backdrop-filter: blur(6px);
+            align-items: center; justify-content: center;
+        }
+        #submit-success-overlay.visible { display: flex; }
+        .submit-success-card {
+            background: white; border-radius: var(--r-xl); padding: 32px 28px;
+            text-align: center; max-width: 300px; width: 90%; box-shadow: var(--shadow-lg);
+            animation: successCardIn 0.4s cubic-bezier(0.34,1.56,0.64,1) both;
+        }
+        @keyframes successCardIn {
+            from { opacity: 0; transform: scale(0.82) translateY(24px); }
+            to   { opacity: 1; transform: scale(1) translateY(0); }
+        }
+        .success-icon { font-size: 50px; line-height: 1; margin-bottom: 10px; }
+        .success-score { font-size: 40px; font-weight: 800; color: var(--primary); line-height: 1; }
+        .success-label { font-size: 13px; color: var(--text-2); margin-top: 4px; margin-bottom: 14px; }
+        .success-bar-wrap { background: var(--accent-light); border-radius: 99px; height: 8px; margin: 0 0 10px; overflow: hidden; }
+        .success-bar-fill { height: 100%; border-radius: 99px; background: linear-gradient(90deg, var(--accent), var(--primary-mid)); transition: width 0.8s cubic-bezier(0.22,1,0.36,1); width: 0; }
+        #ss-pct { font-size: 24px; font-weight: 800; color: var(--accent); margin-bottom: 10px; }
+        .success-msg { font-size: 13px; color: var(--text-2); font-style: italic; }
+
+        /* ── LEADERBOARD ROW STAGGER ── */
+        @keyframes lbRowIn {
+            from { opacity: 0; transform: translateX(-10px); }
+            to   { opacity: 1; transform: translateX(0); }
+        }
+        .lb-row { animation: lbRowIn 0.28s cubic-bezier(0.22,1,0.36,1) both; }
+        .lb-row:nth-child(1)  { animation-delay: 0.03s; }
+        .lb-row:nth-child(2)  { animation-delay: 0.06s; }
+        .lb-row:nth-child(3)  { animation-delay: 0.09s; }
+        .lb-row:nth-child(4)  { animation-delay: 0.12s; }
+        .lb-row:nth-child(5)  { animation-delay: 0.15s; }
+        .lb-row:nth-child(n+6){ animation-delay: 0.18s; }
+
+        /* ── SUB-TAB BAR ── */
+        .subtab-bar {
+            display: flex; gap: 0; background: var(--bg);
+            border-radius: var(--r-lg); padding: 4px;
+            margin-bottom: 14px; overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+        .subtab-btn {
+            flex: 1; min-width: max-content; padding: 9px 14px;
+            border: none; background: none; border-radius: var(--r-md);
+            font-size: 13px; font-weight: 600; color: var(--text-2);
+            cursor: pointer; transition: background 0.18s, color 0.18s;
+            white-space: nowrap;
+        }
+        .subtab-btn.active { background: white; color: var(--primary); box-shadow: var(--shadow-sm); }
+        .subtab-btn:active { transform: scale(0.97); }
+
+        /* ── SUB-PANEL ── */
+        .sub-panel { display: none; }
+        .sub-panel.active {
+            display: block;
+            animation: panelIn 0.24s cubic-bezier(0.22,1,0.36,1) both;
+        }
+
+        /* ── HOME PANEL ── */
+        .home-ring-card { padding: 18px; }
+        .home-ring-row { display: flex; align-items: center; gap: 16px; margin-top: 14px; }
+        .home-ring-wrap { position: relative; flex-shrink: 0; width: 120px; height: 120px; }
+        .home-ring-overlay {
+            position: absolute; inset: 0; display: flex; flex-direction: column;
+            align-items: center; justify-content: center; pointer-events: none;
+        }
+        .home-ring-pct { font-size: 24px; font-weight: 800; color: var(--primary); line-height: 1; }
+        .home-ring-stats { flex: 1; display: flex; flex-direction: column; gap: 8px; }
+        .home-stat-row { display: flex; gap: 8px; }
+        .home-stat-chip {
+            flex: 1; background: var(--bg); border-radius: var(--r-md);
+            padding: 8px 10px; text-align: center;
+        }
+        .home-stat-chip .hsv { font-size: 18px; font-weight: 800; color: var(--primary); display: block; line-height: 1.1; }
+        .home-stat-chip .hsl { font-size: 10px; color: var(--text-3); font-weight: 500; }
+
+        /* ── STREAK DOTS ── */
+        .streak-dots-row {
+            display: flex; justify-content: space-evenly;
+            margin-top: 14px; padding-top: 12px;
+            border-top: 1px solid var(--border);
+        }
+        .streak-day-wrap {
+            display: flex; flex-direction: column; align-items: center; gap: 4px;
+            animation: streakPop 0.3s cubic-bezier(0.34,1.56,0.64,1) both;
+        }
+        @keyframes streakPop {
+            from { opacity: 0; transform: scale(0.5) translateY(4px); }
+            to   { opacity: 1; transform: scale(1) translateY(0); }
+        }
+        .streak-dot {
+            width: 28px; height: 28px; border-radius: 50%;
+            background: var(--border); border: 2px solid var(--border);
+            display: flex; align-items: center; justify-content: center;
+            font-size: 13px; line-height: 1;
+        }
+        .streak-dot.filled { background: #dcfce7; border-color: var(--success); }
+        .streak-dot.filled::after { content: '✓'; color: var(--success); font-weight: 700; font-size: 12px; }
+        .streak-dot.today { border-color: var(--accent); border-width: 2px; }
+        .streak-dot.missed { background: #fff1f1; border-color: #fecaca; }
+        .streak-dot-label { font-size: 10px; color: var(--text-3); font-weight: 600; }
+
+        /* ── HOME FILL ALERT ── */
+        .home-fill-alert {
+            border-left: 4px solid var(--warning) !important;
+            background: #fffbeb !important;
+        }
+
+        /* ── ACTIVITY MINI BARS ── */
+        .act-bar-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+        .act-bar-label { font-size: 11px; color: var(--text-2); font-weight: 600; width: 70px; flex-shrink: 0; text-align: right; }
+        .act-bar-track { flex: 1; background: var(--accent-light); border-radius: 99px; height: 8px; overflow: hidden; }
+        .act-bar-fill { height: 100%; border-radius: 99px; background: var(--accent); transition: width 0.7s cubic-bezier(0.22,1,0.36,1); }
+        .act-bar-val { font-size: 11px; color: var(--text-2); font-weight: 700; width: 36px; text-align: right; }
+
+        /* ── SUBMIT BUTTON PRESS ── */
+        .submit-btn { transition: transform 0.12s cubic-bezier(0.34,1.56,0.64,1) !important; }
+        .submit-btn:active { transform: scale(0.97) !important; }
+
+        /* ── LEADERBOARD TOP 3 PODIUM ── */
+        .lb-podium-wrap { position: relative; }
+        .lb-podium { display: flex; justify-content: center; align-items: flex-end; gap: 16px; margin-bottom: 20px; padding-top: 10px; }
+        .lb-podium-item { display: flex; flex-direction: column; align-items: center; gap: 5px; }
+        .lb-podium-item.rank1 { margin-bottom: 28px; }
+        .lb-podium-item.rank2 { margin-bottom: 8px; }
+        .lb-podium-item.rank3 { margin-bottom: 0; }
+        .lb-podium-avatar {
+            width: 48px; height: 48px; border-radius: 50%;
+            border: 3px solid var(--border); overflow: hidden;
+            background: var(--accent-light); display: flex; align-items: center; justify-content: center;
+            font-size: 18px; font-weight: 700; color: var(--primary);
+        }
+        .lb-podium-avatar.rank1 { width: 76px; height: 76px; border: 4px solid #fbbf24; font-size: 26px;
+            box-shadow: 0 0 20px rgba(251,191,36,0.35); }
+        .lb-podium-avatar.rank2 { width: 58px; height: 58px; border-color: #94a3b8; font-size: 20px; }
+        .lb-podium-avatar.rank3 { border-color: #cd7f32; }
+        .lb-podium-avatar img { width: 100%; height: 100%; object-fit: cover; }
+        .lb-podium-name { font-size: 11px; font-weight: 700; color: var(--primary); text-align: center; max-width: 80px; line-height: 1.2; }
+        .lb-podium-item.rank1 .lb-podium-name { font-size: 13px; font-weight: 800; }
+        .lb-podium-score { font-size: 10px; color: var(--text-2); }
+        .lb-podium-badge { font-size: 20px; }
+        .lb-podium-item.rank1 .lb-podium-badge { font-size: 26px; }
+        @keyframes podiumRise {
+            0%   { opacity: 0; transform: translateY(60px) scale(0.7); }
+            50%  { opacity: 1; }
+            75%  { transform: translateY(-10px) scale(1.06); }
+            100% { opacity: 1; transform: translateY(0) scale(1); }
+        }
+        @keyframes confettiBurst {
+            0%   { opacity: 0; transform: scale(0) rotate(-10deg); }
+            30%  { opacity: 1; transform: scale(1.4) rotate(5deg); }
+            60%  { opacity: 1; transform: scale(1.1) rotate(-3deg); }
+            100% { opacity: 0; transform: scale(2.2) rotate(8deg); }
+        }
+        .lb-podium-item.reveal { animation: podiumRise 0.9s cubic-bezier(0.34,1.56,0.64,1) both; }
+        .lb-confetti {
+            position: absolute; top: 35%; left: 50%; transform: translate(-50%,-50%);
+            font-size: 64px; pointer-events: none; z-index: 10;
+            animation: confettiBurst 1.4s 1.8s ease-out both;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+
+    <!-- ══ AUTH ══ -->
+    <section id="auth-section" class="card">
+        <div class="auth-hero">
+            <span class="auth-logo">🙏</span>
+            <h2 class="auth-title">Sadhna Tracker</h2>
+            <p class="auth-sub">Dedicated to Guru and Gauranga</p>
+        </div>
+        <div class="auth-body">
+            <form id="login-form">
+                <label class="form-label" style="margin-top:0;">Email</label>
+                <input type="email" id="login-email" placeholder="your@email.com" required>
+                <label class="form-label">Password</label>
+                <div class="pwd-wrap"><input type="password" id="login-password" placeholder="Enter password" required><button type="button" class="pwd-eye" onclick="togglePwd('login-password',this)">👁️</button></div>
+                <button type="submit" class="btn-primary" style="margin-top:18px;padding:13px;font-size:15px;border-radius:var(--r-md);">Login</button>
+            </form>
+            <p style="text-align:center;margin-top:14px;">
+                <a href="#" onclick="openForgotPassword(event)" style="color:var(--accent);font-size:13px;text-decoration:none;">Forgot Password?</a>
+            </p>
+            <p style="text-align:center;margin-top:12px;font-size:13px;color:var(--muted);">
+                New here? <a href="signup.html" style="color:var(--primary);font-weight:700;">Sign Up</a>
+            </p>
+        </div>
+    </section>
+
+    <!-- ══ PROFILE SETUP ══ -->
+    <section id="profile-section" class="card hidden">
+        <h2 id="profile-title" style="color:var(--primary);margin-bottom:4px;">Complete Your Profile</h2>
+        <p id="profile-subtitle" style="color:var(--muted);font-size:13px;margin-bottom:20px;">Tell us about yourself to get started</p>
+        <!-- Profile picture -->
+        <div style="text-align:center;margin-bottom:18px;">
+            <div class="av av-lg" id="profile-pic-av" style="width:72px;height:72px;margin:0 auto 10px;">
+                <img id="profile-pic-preview" src="" alt="" style="display:none;">
+                <span class="av-init" id="profile-pic-init"></span>
+            </div>
+            <label for="profile-pic-input" style="cursor:pointer;background:#f1f5f9;border:1px solid #ddd;padding:6px 16px;border-radius:20px;font-size:13px;font-weight:600;color:#374151;display:inline-block;">📷 Change Photo</label>
+            <input type="file" id="profile-pic-input" accept="image/*" style="display:none;" onchange="handleProfilePicSelect(this)">
+        </div>
+        <form id="profile-form">
+            <label class="form-label">Full Name</label>
+            <input type="text" id="profile-name" placeholder="Full Name" required>
+
+            <label class="form-label">Position Level</label>
+            <select id="profile-level" required>
+                <option value="" disabled selected>Select your position</option>
+                <option value="Coordinators">Coordinators</option>
+                <option value="Overall Coordinators">Overall Coordinators</option>
+            </select>
+
+            <label class="form-label">Chanting Category</label>
+            <select id="profile-chanting" required>
+                <option value="" disabled selected>Select chanting level</option>
+                <option value="Level-1">Level-1 (9–15 Rounds)</option>
+                <option value="Level-2">Level-2 (16 Rounds)</option>
+            </select>
+
+            <label class="form-label">Current Exact Rounds</label>
+            <input type="number" id="profile-exact-rounds" placeholder="e.g. 12" required>
+
+            <button type="submit" class="btn-success" style="margin-top:16px;">Save &amp; Continue</button>
+            <button type="button" onclick="showSection('dashboard')" id="cancel-edit" class="btn-gray hidden">Cancel</button>
+        </form>
+    </section>
+
+    <!-- ══ DASHBOARD ══ -->
+    <section id="dashboard-section" class="hidden">
+
+
+
+        <!-- ── APP HEADER ── -->
+        <div class="app-header" style="margin-bottom:12px;">
+            <!-- Left: avatar (opens sidebar/profile) -->
+            <div class="av" id="header-av" style="flex-shrink:0;cursor:pointer;" onclick="openUserSidebar()">
+                <img id="header-av-img" src="" alt="" style="display:none;">
+                <span class="av-init" id="header-av-init"></span>
+            </div>
+            <!-- Center: name + role -->
+            <div style="flex:1;padding:0 6px;min-width:0;">
+                <div class="header-name" id="user-display-name"></div>
+                <div class="header-role" id="user-role-display"></div>
+            </div>
+            <!-- Right: tasks bell + logout -->
+            <button class="header-icon-btn" onclick="scrollToTasks()" title="Tasks" id="header-tasks-btn">
+                📢<span class="header-badge hidden" id="header-tasks-badge">0</span>
+            </button>
+            <button class="header-icon-btn header-logout-btn" id="logout-btn" title="Logout" style="font-size:12px;font-weight:700;width:auto;padding:0 10px;">Logout</button>
+        </div>
+        <!-- Hidden: admin menu btn kept for JS reference -->
+        <button id="admin-menu-btn" class="hidden" style="display:none!important;"></button>
+
+        <!-- ── GITA BANNER ── -->
+        <div class="gita-banner" style="margin-bottom:14px;justify-content:center;">
+            <div class="gita-banner-bg"></div>
+            <!-- Replace src below with your image URL -->
+            <img class="gita-banner-img" src="banner.png" alt="" id="banner-bg-img" onerror="this.style.display='none'">
+        <div class="gita-banner-content">
+                <div class="gita-shloka">युक्ताहारविहारस्य युक्तचेष्टस्य कर्मसु ।<br>युक्तस्वप्‍नावबोधस्य योगो भवति दु:खहा</div>
+                <div class="gita-translation">जो व्यक्ति अपने खान-पान, सोने, मनोरंजन और काम करने की आदतों में संयम बरतता है, वह योग प्रणाली का अभ्यास करके सभी भौतिक कष्टों को कम कर सकता है।</div>
+                <div class="gita-ref">— Bhagavad Gita 6.17</div>
+            </div>
+        </div>
+
+        <!-- ── NAV TABS ── -->
+        <!-- Regular user tabs -->
+        <div id="user-nav-tabs" class="nav-tabs" style="margin-bottom:16px;">
+            <button class="tab-btn active" onclick="switchTab('sadhana')">Daily Entry</button>
+            <button class="tab-btn"        onclick="switchTab('reports')">My Reports</button>
+            <button class="tab-btn"        onclick="switchTab('progress')">My Progress</button>
+            <button class="tab-btn"        onclick="switchTab('wcr')" id="user-wcr-tab" style="display:none;">&#128202; WCR</button>
+            <button class="tab-btn"        onclick="switchTab('leaderboard')" id="user-lb-tab">&#127942; Leaderboard</button>
+            <button class="tab-btn"        onclick="switchTab('tasks')" id="user-tasks-tab">&#128203; Tasks</button>
+        </div>
+        <!-- Super Admin direct tabs (hidden for regular users) -->
+        <div id="sa-nav-tabs" class="nav-tabs" style="margin-bottom:16px;display:none;">
+            <button class="tab-btn sa-tab active" onclick="saTab('reports',this)">&#128202; WCR</button>
+            <button class="tab-btn sa-tab"        onclick="saTab('usermgmt',this)">&#128100; Individual Reports</button>
+            <button class="tab-btn sa-tab"        onclick="saTab('inactive',this)">&#9888; Inactive Devotees</button>
+            <button class="tab-btn sa-tab"        onclick="saTab('leaderboard',this)">&#127942; Leaderboard</button>
+            <button class="tab-btn sa-tab"        onclick="saTab('tasks',this)">&#128203; Tasks</button>
+        </div>
+
+        <!-- ══ HOME PANEL ══ -->
+        <div id="home-panel" class="tab-panel">
+            <div class="card home-ring-card">
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0;flex-wrap:wrap;gap:8px;">
+                    <div class="section-title" style="margin:0;">📅 Weekly Summary</div>
+                    <div class="chart-tabs" style="margin:0;" id="home-week-tabs">
+                        <button class="chart-tab-btn active" onclick="switchHomeWeek(0,this)">This Week</button>
+                        <button class="chart-tab-btn"        onclick="switchHomeWeek(1,this)">Last Week</button>
+                    </div>
+                </div>
+                <div class="home-ring-row">
+                    <div class="home-ring-wrap">
+                        <canvas id="home-ring-canvas" width="120" height="120"></canvas>
+                        <div class="home-ring-overlay">
+                            <div class="home-ring-pct" id="home-ring-pct">--%</div>
+                            <div style="font-size:10px;color:var(--text-3);">score</div>
+                        </div>
+                    </div>
+                    <div class="home-ring-stats">
+                        <div class="home-stat-row">
+                            <div class="home-stat-chip">
+                                <span class="hsv" id="home-week-pts">--</span>
+                                <span class="hsl">Points</span>
+                            </div>
+                            <div class="home-stat-chip">
+                                <span class="hsv" id="home-days-count">0</span>
+                                <span class="hsl">Days Filled</span>
+                            </div>
+                        </div>
+                        <div class="home-stat-row">
+                            <div class="home-stat-chip" style="flex:1;">
+                                <span class="hsv" id="home-streak-count">0</span>
+                                <span class="hsl">🔥 day streak</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="streak-dots-row" id="home-streak-row"></div>
+            </div>
+            <div class="card home-fill-alert hidden" id="home-fill-alert">
+                <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
+                    <span style="font-size:24px;">⚠️</span>
+                    <span style="font-size:14px;font-weight:600;color:var(--primary);" id="home-fill-msg">Haven't filled today's sadhna yet <span style="font-weight:400;color:var(--text-2);font-size:12.5px;">(आज की साधना अभी भरी नहीं है)</span></span>
+                </div>
+                <button class="btn-primary submit-btn" onclick="switchTab('mysadhana');switchSadhanaTab('entry')"
+                    style="width:100%;padding:12px;font-size:14px;">📝 Fill Today's Sadhna →</button>
+            </div>
+            <div class="card" id="home-activity-card" style="display:none;">
+                <div class="section-title">📊 Activity This Week</div>
+                <div id="home-activity-bars"></div>
+            </div>
+            <div class="card">
+                <div class="section-title">📢 Tasks &amp; Announcements</div>
+                <div id="tasks-container"><p style="color:#aaa;text-align:center;padding:16px;">Loading…</p></div>
+            </div>
+        </div>
+
+        <!-- ══ MY SADHANA PANEL ══ -->
+        <div id="mysadhana-panel" class="tab-panel">
+            <div class="subtab-bar">
+                <button class="subtab-btn active" id="stab-entry"    onclick="switchSadhanaTab('entry',this)">📝 Entry</button>
+                <button class="subtab-btn"         id="stab-reports"  onclick="switchSadhanaTab('reports',this)">📋 Reports</button>
+                <button class="subtab-btn"         id="stab-progress" onclick="switchSadhanaTab('progress',this)">📈 Progress</button>
+            </div>
+            <div id="sadhana-entry-sub" class="sub-panel active">
+                <div class="card" style="padding:18px;">
+                    <form id="sadhana-form">
+                        <!-- Date -->
+                        <div style="margin-bottom:16px;">
+                        <label class="form-label" style="margin-top:0;">📅 Date</label>
+                        <select id="sadhana-date" required></select>
+                    </div>
+
+                    <!-- Time Group -->
+                    <div class="form-section">
+                        <div class="form-section-title">⏰ Times</div>
+                        <div class="field-row-2" style="margin-bottom:10px;">
+                            <div class="field-group">
+                                <label class="form-label">🛌 Bed Time</label>
+                                <input type="time" id="sleep-time" required oninput="updateTimeHint('sleep-time','sleep-hint')">
+                                <div id="sleep-hint" class="time-hint"></div>
+                            </div>
+                            <div class="field-group">
+                                <label class="form-label">⏰ Wake Up</label>
+                                <input type="time" id="wakeup-time" required oninput="updateTimeHint('wakeup-time','wakeup-hint')">
+                                <div id="wakeup-hint" class="time-hint"></div>
+                            </div>
+                        </div>
+                        <div class="field-group">
+                            <label class="form-label">📿 Chanting Completed By</label>
+                            <input type="time" id="chanting-time" required oninput="updateTimeHint('chanting-time','chanting-hint')">
+                            <div id="chanting-hint" class="time-hint"></div>
+                        </div>
+                    </div>
+
+                    <!-- Activities Group -->
+                    <div class="form-section">
+                        <div class="form-section-title">📖 Activities (minutes)</div>
+                        <div class="field-row-2">
+                            <div class="field-group">
+                                <label class="form-label">📖 Reading</label>
+                                <input type="number" id="reading-mins" value="0" min="0" required>
+                            </div>
+                            <div class="field-group">
+                                <label class="form-label">🎧 Hearing</label>
+                                <input type="number" id="hearing-mins" value="0" min="0" required>
+                            </div>
+                            <div id="service-area" class="field-group">
+                                <label class="form-label">🛠️ Service</label>
+                                <input type="number" id="service-mins" value="0" min="0" required>
+                            </div>
+                            <div id="notes-area" class="field-group hidden">
+                                <label class="form-label">📝 Notes Revision</label>
+                                <input type="number" id="notes-mins" value="0" min="0">
+                            </div>
+                            <div class="field-group">
+                                <label class="form-label">😴 Day Sleep</label>
+                                <input type="number" id="day-sleep-minutes" value="0" required>
+                            </div>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="btn-success submit-btn" style="margin-top:4px;padding:14px;font-size:15px;letter-spacing:0.02em;">
+                        ✅ Submit Sadhna
+                    </button>
+                </form>
+                </div>
+            </div>
+            <!-- Reports sub-panel -->
+            <div id="sadhana-reports-sub" class="sub-panel">
+                <div class="card" style="display:flex;align-items:center;justify-content:space-between;padding:14px 18px;">
+                    <div style="font-weight:700;font-size:14px;color:var(--primary);">📅 My Sadhna History</div>
+                    <button onclick="downloadUserExcel(currentUser.uid, userProfile.name)" class="btn-success btn-sm" style="width:auto;padding:8px 16px;">⬇ Excel</button>
+                </div>
+                <div id="weekly-reports-container"></div>
+            </div>
+            <!-- Progress sub-panel -->
+            <div id="sadhana-progress-sub" class="sub-panel">
+                <div class="card">
+                    <div class="section-title">📈 My Progress</div>
+                    <div class="chart-tabs">
+                        <button class="chart-tab-btn active" onclick="setChartView('daily', this)">Daily</button>
+                        <button class="chart-tab-btn"        onclick="setChartView('weekly', this)">Weekly</button>
+                        <button class="chart-tab-btn"        onclick="setChartView('monthly', this)">Monthly</button>
+                    </div>
+                    <div class="chart-container"><canvas id="my-progress-chart"></canvas></div>
+                    <p style="font-size:11px;color:var(--muted);text-align:center;margin-top:8px;">Daily max: 160 · Weekly max: 1120</p>
+                </div>
+                <div class="card" style="display:flex;align-items:center;justify-content:space-between;padding:16px 18px;">
+                    <div>
+                        <div style="font-weight:700;font-size:14px;color:var(--primary);">📊 Activity Analysis</div>
+                        <div style="font-size:12px;color:var(--muted);margin-top:2px;">See where you're excelling and where to improve</div>
+                    </div>
+                    <button class="btn-primary" style="width:auto;padding:8px 16px;font-size:13px;white-space:nowrap;margin-left:12px;"
+                        onclick="openActivityAnalysis(currentUser.uid, userProfile.name)">View →</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- ══ TEAM PANEL ══ -->
+        <div id="team-panel" class="tab-panel">
+            <!-- Sub-tabs: Rankings always shown; WCR visible for admins only -->
+            <div class="subtab-bar" id="team-subtab-bar">
+                <button class="subtab-btn active" id="team-btn-rankings" onclick="switchTeamTab('rankings',this)">🏆 Rankings</button>
+                <button class="subtab-btn hidden" id="team-btn-wcr"      onclick="switchTeamTab('wcr',this)">📊 WCR</button>
+            </div>
+            <!-- Rankings sub-panel -->
+            <div id="team-rankings-sub" class="sub-panel active">
+                <div class="card">
+                    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
+                        <div class="section-title" style="margin:0;">🏆 Leaderboard</div>
+                        <button onclick="loadLeaderboard(true)" style="width:auto;padding:6px 14px;font-size:12px;" class="btn-primary">⟳ Refresh</button>
+                    </div>
+                    <div class="chart-tabs" style="margin-bottom:12px;" id="lb-mode-tabs">
+                        <button class="chart-tab-btn" onclick="setLbMode('daily',this)">Yesterday</button>
+                        <button class="chart-tab-btn active" onclick="setLbMode('current-week',this)">This Week</button>
+                        <button class="chart-tab-btn" onclick="setLbMode('prev-week',this)">Last Week</button>
+                    </div>
+                    <div id="lb-date-label" style="font-size:12px;color:#6b7280;margin-bottom:10px;"></div>
+                    <div class="lb-podium-wrap">
+                        <div id="lb-podium" class="lb-podium" style="display:none;"></div>
+                    </div>
+                    <div id="leaderboard-container"><p style="color:#aaa;text-align:center;padding:20px;">Loading…</p></div>
+                </div>
+            </div>
+            <!-- WCR sub-panel (category admins only) -->
+            <div id="team-wcr-sub" class="sub-panel">
+                <div class="card">
+                    <div class="section-title" style="margin-bottom:14px;">📊 Weekly Comparative Report</div>
+                    <div id="user-performers-section" style="margin-bottom:18px;">
+                        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:12px;">
+                            <div style="font-size:13px;font-weight:700;color:#555;">🏆 Best &amp; Weak Performers</div>
+                            <div style="display:flex;gap:6px;align-items:center;">
+                                <select id="perf-year-sel" onchange="onPerfYearChange()" style="width:auto;padding:5px 10px;font-size:12px;border-radius:8px;border:1px solid #ddd;margin:0;"></select>
+                                <select id="perf-month-sel" onchange="onPerfMonthChange()" style="width:auto;padding:5px 10px;font-size:12px;border-radius:8px;border:1px solid #ddd;margin:0;"></select>
+                                <select id="perf-week-sel" onchange="onPerfWeekChange()" style="width:auto;padding:5px 10px;font-size:12px;border-radius:8px;border:1px solid #ddd;margin:0;display:none;"></select>
+                                <div style="display:flex;gap:4px;">
+                                    <button class="perf-tab-btn active" id="perf-tab-weekly" onclick="setPerfTab('weekly',this)" style="width:auto;padding:4px 11px;font-size:11px;font-weight:700;border-radius:16px;border:1.5px solid #1A3C5E;background:#1A3C5E;color:white;cursor:pointer;margin:0;">Weekly</button>
+                                    <button class="perf-tab-btn" id="perf-tab-monthly" onclick="setPerfTab('monthly',this)" style="width:auto;padding:4px 11px;font-size:11px;font-weight:700;border-radius:16px;border:1.5px solid #ddd;background:white;color:#555;cursor:pointer;margin:0;">Monthly</button>
+                                </div>
+                            </div>
+                        </div>
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+                            <div class="card" style="padding:14px;border:1px solid #e5e7eb;">
+                                <div style="font-size:12px;font-weight:700;color:#15803d;margin-bottom:10px;">🏆 Top Performers</div>
+                                <div id="best-performers-chart"></div>
+                            </div>
+                            <div class="card" style="padding:14px;border:1px solid #e5e7eb;">
+                                <div style="font-size:12px;font-weight:700;color:#dc2626;margin-bottom:10px;">🔴 Needs Attention</div>
+                                <div id="weak-performers-chart"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div id="user-wcr-container"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ADMIN PANEL (SA direct access + category admin Manage tab) -->
+        <div id="admin-panel" class="tab-panel">
+
+            <!-- Sub-nav shown for category admins via Manage tab (hidden for SA who uses bottom nav) -->
+            <div id="admin-sub-nav" class="subtab-bar" style="display:none;">
+                <button class="subtab-btn active" onclick="selectAdminSection('reports',this)">📊 WCR</button>
+                <button class="subtab-btn"        onclick="selectAdminSection('usermgmt',this)">👤 Devotees</button>
+                <button class="subtab-btn"        onclick="selectAdminSection('inactive',this)">⚠️ Inactive</button>
+                <button class="subtab-btn"        onclick="selectAdminSection('leaderboard',this)">🏆 Rankings</button>
+            </div>
+
+            <!-- Content area -->
+            <div id="admin-content-area">
+                <!-- SA Home Dashboard -->
+                <div id="admin-sub-home" class="admin-sub-panel hidden">
+                    <!-- Total + Category Filters -->
+                    <div class="card" style="margin-bottom:14px;padding:14px 18px;">
+                        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:10px;">
+                            <div>
+                                <span style="font-size:24px;font-weight:800;color:var(--primary);" id="sa-home-total">0</span>
+                                <span style="font-size:13px;color:var(--text-2);font-weight:600;margin-left:4px;">Total Devotees</span>
+                            </div>
+                            <div class="chart-tabs" style="margin:0;" id="sa-home-week-tabs">
+                                <button class="chart-tab-btn active" onclick="loadSAHome(0,this)">This Week</button>
+                                <button class="chart-tab-btn"        onclick="loadSAHome(1,this)">Last Week</button>
+                            </div>
+                        </div>
+                        <div style="display:flex;gap:6px;flex-wrap:wrap;" id="sa-home-cat-filters">
+                            <button class="sa-lvl-btn active" onclick="filterSAHome('',this)">All</button>
+                            <button class="sa-lvl-btn" onclick="filterSAHome('Coord',this)">Coord <span id="sa-cat-count-Coord" style="opacity:.6;"></span></button>
+                            <button class="sa-lvl-btn" onclick="filterSAHome('OC',this)">OC <span id="sa-cat-count-OC" style="opacity:.6;"></span></button>
+                        </div>
+                    </div>
+                    <!-- Devotee Table -->
+                    <div class="card" style="margin-bottom:14px;max-height:60vh;overflow:auto;position:relative;padding:0;">
+                            <table style="width:100%;border-collapse:collapse;font-size:13px;" id="sa-home-table">
+                                <thead><tr style="background:var(--primary);color:white;">
+                                    <th style="padding:8px 10px;text-align:left;position:sticky;top:0;z-index:3;background:var(--primary);">Devotee</th>
+                                    <th style="padding:8px 6px;text-align:center;position:sticky;top:0;z-index:3;background:var(--primary);">Cat</th>
+                                    <th style="padding:8px 6px;text-align:center;position:sticky;top:0;z-index:3;background:var(--primary);">Filled</th>
+                                    <th style="padding:8px 6px;text-align:center;position:sticky;top:0;z-index:3;background:var(--primary);">Missed</th>
+                                    <th style="padding:8px 6px;text-align:center;position:sticky;top:0;z-index:3;background:var(--primary);">%</th>
+                                </tr></thead>
+                                <tbody id="sa-home-tbody"><tr><td colspan="5" style="text-align:center;padding:20px;color:#aaa;">Loading...</td></tr></tbody>
+                            </table>
+                    </div>
+                    <!-- Top 3 Quick -->
+                    <div class="card" style="cursor:pointer;" onclick="saTab('leaderboard',null)">
+                        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+                            <div class="section-title" style="margin:0;">🏆 Top 3 This Week</div>
+                            <span style="font-size:12px;color:var(--accent);font-weight:600;">View All →</span>
+                        </div>
+                        <div id="sa-home-top3"></div>
+                    </div>
+                </div>
+
+                <!-- Default: Reports -->
+                <div id="admin-sub-reports" class="admin-sub-panel hidden">
+                    <div style="margin-bottom:14px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
+                        <h3 style="margin:0;color:var(--primary);font-size:15px;">&#128202; 4-Week Performance (%)</h3>
+                        <div style="display:flex;gap:6px;flex-wrap:wrap;">
+                            <button onclick="downloadMasterReport()" class="btn-success btn-sm" style="width:auto;padding:8px 14px;">&#11015; Master</button>
+                            <select id="cat-excel-sel" style="width:auto;padding:6px 10px;font-size:12px;border-radius:8px;border:1px solid #ddd;margin:0;" onchange="if(this.value){downloadCategoryExcel(this.value);this.value='';}">
+                                <option value="">&#11015; Category Excel</option>
+                                <option value="Coordinators">Coordinators</option>
+                                <option value="Overall Coordinators">Overall Coordinators</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="sa-lvl-bar" style="display:none;margin-bottom:10px;gap:7px;flex-wrap:wrap;">
+                        <button class="sa-lvl-btn active" onclick="saLvlFilter('reports','',this)">All</button>
+                        <button class="sa-lvl-btn" onclick="saLvlFilter('reports','Coord',this)">Coordinators</button>
+                        <button class="sa-lvl-btn" onclick="saLvlFilter('reports','OC',this)">Overall Coordinators</button>
+                    </div>
+                    <!-- Best & Weak Performers for Super Admin -->
+                    <div id="sa-performers-section" style="margin-bottom:18px;">
+                        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:12px;">
+                            <div style="font-size:13px;font-weight:700;color:#555;">&#127942; Best &amp; Weak Performers</div>
+                            <div style="display:flex;gap:6px;align-items:center;">
+                                <select id="sa-perf-year-sel" onchange="onSAPerfYearChange()" style="width:auto;padding:5px 10px;font-size:12px;border-radius:8px;border:1px solid #ddd;margin:0;"></select>
+                                <select id="sa-perf-month-sel" onchange="onSAPerfMonthChange()" style="width:auto;padding:5px 10px;font-size:12px;border-radius:8px;border:1px solid #ddd;margin:0;"></select>
+                                <select id="sa-perf-week-sel" onchange="onSAPerfWeekChange()" style="width:auto;padding:5px 10px;font-size:12px;border-radius:8px;border:1px solid #ddd;margin:0;display:none;"></select>
+                                <div style="display:flex;gap:4px;">
+                                    <button class="perf-tab-btn active" id="sa-perf-tab-weekly" onclick="setSAPerfTab('weekly',this)" style="width:auto;padding:4px 11px;font-size:11px;font-weight:700;border-radius:16px;border:1.5px solid #1A3C5E;background:#1A3C5E;color:white;cursor:pointer;margin:0;">Weekly</button>
+                                    <button class="perf-tab-btn" id="sa-perf-tab-monthly" onclick="setSAPerfTab('monthly',this)" style="width:auto;padding:4px 11px;font-size:11px;font-weight:700;border-radius:16px;border:1.5px solid #ddd;background:white;color:#555;cursor:pointer;margin:0;">Monthly</button>
+                                </div>
+                            </div>
+                        </div>
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+                            <div class="card" style="padding:14px;border:1px solid #e5e7eb;">
+                                <div style="font-size:12px;font-weight:700;color:#15803d;margin-bottom:10px;">&#127942; Top Performers</div>
+                                <div id="sa-best-performers-chart"></div>
+                            </div>
+                            <div class="card" style="padding:14px;border:1px solid #e5e7eb;">
+                                <div style="font-size:12px;font-weight:700;color:#dc2626;margin-bottom:10px;">&#128997; Needs Attention</div>
+                                <div id="sa-weak-performers-chart"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card" style="overflow-x:auto;overflow-y:auto;max-height:70vh;">
+                        <div id="admin-comparative-reports-container"></div>
+                    </div>
+                </div>
+
+                <!-- User Management -->
+                <div id="admin-sub-usermgmt" class="admin-sub-panel hidden">
+                    <h3 style="margin:0 0 14px;color:var(--primary);font-size:15px;">&#128100; Individual Reports</h3>
+                    <div class="sa-lvl-bar" style="display:none;margin-bottom:10px;gap:7px;flex-wrap:wrap;">
+                        <button class="sa-lvl-btn active" onclick="saLvlFilter('usermgmt','',this)">All</button>
+                        <button class="sa-lvl-btn" onclick="saLvlFilter('usermgmt','Coord',this)">Coordinators</button>
+                        <button class="sa-lvl-btn" onclick="saLvlFilter('usermgmt','OC',this)">Overall Coordinators</button>
+                    </div>
+                    <div class="card">
+                        <div class="admin-search-bar">
+                            <input type="text" id="admin-search-input" placeholder="Search devotee by name..." oninput="filterAdminUsers()" style="margin:0;flex:1;">
+                            <select id="admin-category-filter" onchange="filterAdminUsers()" style="margin:0;width:auto;flex-shrink:0;padding:10px 12px;font-size:13px;">
+                                <option value="">All Categories</option>
+                                <option value="Coord">Coordinators</option>
+                                <option value="OC">Overall Coordinators</option>
+                            </select>
+                        </div>
+                        <div id="admin-users-list"></div>
+                    </div>
+                </div>
+
+                <!-- Inactive Devotees -->
+                <div id="admin-sub-inactive" class="admin-sub-panel hidden">
+                    <h3 style="margin:0 0 10px;color:var(--primary);font-size:15px;">&#9888; Inactive Devotees</h3>
+                    <div class="sa-lvl-bar" style="display:none;margin-bottom:10px;gap:7px;flex-wrap:wrap;">
+                        <button class="sa-lvl-btn active" onclick="saLvlFilter('inactive','',this)">All</button>
+                        <button class="sa-lvl-btn" onclick="saLvlFilter('inactive','Coord',this)">Coordinators</button>
+                        <button class="sa-lvl-btn" onclick="saLvlFilter('inactive','OC',this)">Overall Coordinators</button>
+                    </div>
+                    <div id="admin-inactive-container"></div>
+                </div>
+
+                <!-- SA Leaderboard sub-panel -->
+                <div id="admin-sub-leaderboard" class="admin-sub-panel hidden">
+                    <div class="card">
+                        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:8px;">
+                            <h3 style="margin:0;color:var(--primary);font-size:15px;">&#127942; Leaderboard</h3>
+                            <button onclick="loadLeaderboard(true)" style="width:auto;padding:6px 14px;font-size:12px;" class="btn-primary">&#8635; Refresh</button>
+                        </div>
+                        <div class="chart-tabs" style="margin-bottom:10px;" id="sa-lb-mode-tabs">
+                            <button class="chart-tab-btn" onclick="setLbMode('daily',this)">Yesterday</button>
+                            <button class="chart-tab-btn active" onclick="setLbMode('current-week',this)">This Week</button>
+                            <button class="chart-tab-btn" onclick="setLbMode('prev-week',this)">Last Week</button>
+                        </div>
+                        <div id="sa-lb-date-label" style="font-size:12px;color:#6b7280;margin-bottom:10px;"></div>
+                        <div class="lb-podium-wrap">
+                            <div id="sa-lb-podium" class="lb-podium" style="display:none;"></div>
+                        </div>
+                        <div id="sa-leaderboard-container"><p style="color:#aaa;text-align:center;padding:20px;">Loading…</p></div>
+                    </div>
+                </div>
+
+                <!-- SA Tasks sub-panel -->
+                <div id="admin-sub-tasks" class="admin-sub-panel hidden">
+                    <div class="card" style="margin-bottom:14px;">
+                        <h3 style="margin:0 0 14px;color:var(--primary);font-size:15px;">&#128203; Post a Task / Announcement</h3>
+                        <input type="text" id="task-title-input" placeholder="Title (required)" style="margin-bottom:8px;">
+                        <textarea id="task-body-input" placeholder="Description / instructions (optional)" rows="3" style="width:100%;padding:10px 13px;border:1px solid #ddd;border-radius:8px;font-size:14px;resize:vertical;margin-bottom:8px;font-family:inherit;"></textarea>
+                        <input type="url" id="task-url-input" placeholder="Link URL (optional — Google Drive, YouTube, etc.)" style="margin-bottom:8px;">
+                        <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+                            <label style="flex:1;display:flex;align-items:center;gap:8px;padding:10px 14px;border:1.5px dashed var(--border);border-radius:var(--r-md);cursor:pointer;font-size:13px;color:var(--text-2);background:#fafcff;margin:0;width:auto;">
+                                📎 <span id="task-file-label">Attach file (any type, max 1MB)</span>
+                                <input type="file" id="task-file-input" style="display:none;" onchange="handleTaskFile(this)">
+                            </label>
+                            <button type="button" id="task-file-clear" style="display:none;width:auto;padding:6px 10px;font-size:11px;border-radius:6px;background:#fee2e2;color:#dc2626;border:none;cursor:pointer;margin:0;" onclick="clearTaskFile()">✕ Remove</button>
+                        </div>
+                        <select id="task-category-sel" style="margin-bottom:10px;">
+                            <option value="all">📢 All Categories</option>
+                            <option value="Coordinators">Coordinators only</option>
+                            <option value="Overall Coordinators">Overall Coordinators only</option>
+                        </select>
+                        <button onclick="postTask()" class="btn-primary" style="width:auto;padding:9px 24px;">Post Task</button>
+                    </div>
+                    <div id="sa-tasks-container"><p style="color:#aaa;text-align:center;padding:20px;">Loading…</p></div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Drawer Overlay -->
+        <div id="admin-drawer-overlay" class="drawer-overlay hidden" onclick="closeAdminDrawer()"></div>
+
+        <!-- Left Drawer -->
+        <div id="admin-drawer" class="admin-drawer">
+            <div class="drawer-header">
+                <span>&#128272; Admin Menu</span>
+                <button onclick="closeAdminDrawer()" class="drawer-close">&#10005;</button>
+            </div>
+            <nav class="drawer-nav">
+                <button class="drawer-nav-item active" onclick="selectAdminSection('reports', this)">
+                    <span class="drawer-icon">&#128202;</span>
+                    <span>WCR</span>
+                </button>
+                <button class="drawer-nav-item" onclick="selectAdminSection('usermgmt', this)">
+                    <span class="drawer-icon">&#128101;</span>
+                    <span>Individual Reports</span>
+                </button>
+                <button class="drawer-nav-item" onclick="selectAdminSection('inactive', this)">
+                    <span class="drawer-icon">&#9888;&#65039;</span>
+                    <span>Inactive Devotees</span>
+                    <span id="inactive-tab-badge" class="inactive-tab-count"></span>
+                </button>
+                <button class="drawer-nav-item" onclick="selectAdminSection('leaderboard', this)">
+                    <span class="drawer-icon">&#127942;</span>
+                    <span>Leaderboard</span>
+                </button>
+                <button class="drawer-nav-item" onclick="selectAdminSection('tasks', this)">
+                    <span class="drawer-icon">&#128203;</span>
+                    <span>Tasks</span>
+                </button>
+            </nav>
+        </div>
+
+    </section>
+</div>
+
+<!-- ── USER SIDEBAR moved to body level ── -->
+        <div id="user-sidebar" class="user-sidebar">
+            <div class="user-sidebar-header">
+                <button class="user-sidebar-close" onclick="closeUserSidebar()">&#10005;</button>
+                <div style="display:flex;align-items:center;gap:12px;margin-top:4px;">
+                    <div class="av av-lg" id="sidebar-av" style="border-color:rgba(255,255,255,0.6);background:rgba(255,255,255,0.15);">
+                        <img id="sidebar-av-img" src="" alt="" style="display:none;">
+                        <span class="av-init" id="sidebar-av-init" style="color:white;font-size:20px;"></span>
+                    </div>
+                    <div>
+                        <div class="user-sidebar-name" id="sidebar-user-name">—</div>
+                        <div class="user-sidebar-role" id="sidebar-user-role">—</div>
+                    </div>
+                </div>
+            </div>
+            <div class="sidebar-nav">
+                <button class="sidebar-item" onclick="closeUserSidebar(); openActivityAnalysis(currentUser.uid, userProfile.name);">
+                    <span class="sidebar-item-icon">&#128202;</span>
+                    <span class="sidebar-item-label">Activity Analysis</span>
+                </button>
+                <button class="sidebar-item" onclick="closeUserSidebar(); openProfileEdit();">
+                    <span class="sidebar-item-icon">&#9999;&#65039;</span>
+                    <span class="sidebar-item-label">Edit Profile</span>
+                </button>
+                <button class="sidebar-item" onclick="closeUserSidebar(); openPasswordModal();">
+                    <span class="sidebar-item-icon">&#128273;</span>
+                    <span class="sidebar-item-label">Change Password</span>
+                </button>
+                <button class="sidebar-item" onclick="closeUserSidebar(); openNotificationsPanel();">
+                    <span class="sidebar-item-icon">&#128276;</span>
+                    <span class="sidebar-item-label">Notifications</span>
+                    <span class="sidebar-item-badge hidden" id="sidebar-notif-badge">0</span>
+                </button>
+                <div class="sidebar-divider"></div>
+                <button class="sidebar-item" onclick="closeUserSidebar(); openUserGuide();">
+                    <span class="sidebar-item-icon">&#128214;</span>
+                    <span class="sidebar-item-label">User Guide</span>
+                </button>
+                <button class="sidebar-item" onclick="closeUserSidebar(); openAbout();">
+                    <span class="sidebar-item-icon">&#8505;&#65039;</span>
+                    <span class="sidebar-item-label">About</span>
+                </button>
+                <div class="sidebar-divider"></div>
+                <button class="sidebar-item" onclick="closeUserSidebar(); requestNotificationPermission();">
+                    <span class="sidebar-item-icon" id="sidebar-bell-icon">&#128276;</span>
+                    <span class="sidebar-item-label" id="sidebar-bell-label">Enable Notifications</span>
+                </button>
+            </div>
+            <button class="sidebar-logout" onclick="document.getElementById('logout-btn').click()">
+                &#128682; Logout
+            </button>
+        </div>
+
+<!-- ── SIDEBAR OVERLAY (body level) ── -->
+<div id="sidebar-overlay" class="sidebar-overlay" onclick="closeUserSidebar()"></div>
+
+<!-- ══════════════════════════════════════════════════════ -->
+<!-- MODAL: User History                                    -->
+<!-- ══════════════════════════════════════════════════════ -->
+<div id="user-report-modal" class="modal-overlay hidden">
+    <div class="modal-box">
+        <button class="modal-close" onclick="closeUserModal()">×</button>
+        <div class="modal-title" id="modal-user-name"></div>
+        <div id="modal-report-container"></div>
+    </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════ -->
+<!-- MODAL: Progress Chart                                  -->
+<!-- ══════════════════════════════════════════════════════ -->
+<div id="progress-modal" class="modal-overlay hidden">
+    <div class="modal-box">
+        <button class="modal-close" onclick="closeProgressModal()">×</button>
+        <div class="modal-title" id="progress-modal-title">Progress</div>
+        <div class="chart-tabs" id="progress-modal-tabs">
+            <button class="chart-tab-btn active" onclick="setModalChartView('daily', this)">Daily</button>
+            <button class="chart-tab-btn"        onclick="setModalChartView('weekly', this)">Weekly</button>
+            <button class="chart-tab-btn"        onclick="setModalChartView('monthly', this)">Monthly</button>
+        </div>
+        <div class="chart-container" style="height:280px;"><canvas id="modal-progress-chart"></canvas></div>
+        <p style="font-size:11px;color:var(--muted);text-align:center;margin-top:8px;">Daily max: 160 · Weekly max: 1120</p>
+    </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════ -->
+<!-- MODAL: Change Password                                 -->
+<!-- ══════════════════════════════════════════════════════ -->
+<div id="password-modal" class="modal-overlay hidden">
+    <div class="modal-box sm">
+        <button class="modal-close" onclick="closePasswordModal()">×</button>
+        <div class="modal-title">🔑 Change Password</div>
+        <div class="pwd-field-group">
+            <label>Current Password</label>
+            <div class="pwd-wrap"><input type="password" id="pwd-current" placeholder="Enter your current password" autocomplete="current-password"><button type="button" class="pwd-eye" onclick="togglePwd('pwd-current',this)">👁️</button></div>
+        </div>
+        <div class="pwd-field-group">
+            <label>New Password</label>
+            <div class="pwd-wrap"><input type="password" id="pwd-new" placeholder="Minimum 6 characters" autocomplete="new-password"><button type="button" class="pwd-eye" onclick="togglePwd('pwd-new',this)">👁️</button></div>
+        </div>
+        <div class="pwd-field-group">
+            <label>Confirm New Password</label>
+            <div class="pwd-wrap"><input type="password" id="pwd-confirm" placeholder="Re-enter new password" autocomplete="new-password"><button type="button" class="pwd-eye" onclick="togglePwd('pwd-confirm',this)">👁️</button></div>
+        </div>
+        <button onclick="submitPasswordChange()" class="btn-primary" style="margin-top:6px;">Update Password</button>
+        <button onclick="closePasswordModal()" class="btn-gray">Cancel</button>
+    </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════ -->
+<!-- MODAL: Edit Sadhna (Super Admin only)                  -->
+<!-- ══════════════════════════════════════════════════════ -->
+<div id="edit-sadhana-modal" class="modal-overlay hidden">
+    <div class="modal-box md">
+        <button class="modal-close" onclick="closeEditModal()">×</button>
+        <div class="modal-title" id="edit-modal-title">✏️ Edit Sadhna</div>
+
+        <!-- Hidden: user level for scoring context -->
+        <input type="hidden" id="edit-user-level">
+
+        <div class="edit-grid">
+            <div class="edit-field-group">
+                <label>Bed Time (Night)</label>
+                <input type="time" id="edit-sleep-time" oninput="updateEditPreview();updateTimeHint('edit-sleep-time','edit-sleep-hint')">
+                <div id="edit-sleep-hint" class="time-hint"></div>
+            </div>
+            <div class="edit-field-group">
+                <label>Wake Up Time</label>
+                <input type="time" id="edit-wakeup-time" oninput="updateEditPreview();updateTimeHint('edit-wakeup-time','edit-wakeup-hint')">
+                <div id="edit-wakeup-hint" class="time-hint"></div>
+            </div>
+            <div class="edit-field-group">
+                <label>Chanting Completed By</label>
+                <input type="time" id="edit-chanting-time" oninput="updateEditPreview();updateTimeHint('edit-chanting-time','edit-chanting-hint')">
+                <div id="edit-chanting-hint" class="time-hint"></div>
+            </div>
+            <div class="edit-field-group">
+                <label>Day Sleep (mins)</label>
+                <input type="number" id="edit-day-sleep-mins" min="0" oninput="updateEditPreview()">
+            </div>
+            <div class="edit-field-group">
+                <label>Reading (mins)</label>
+                <input type="number" id="edit-reading-mins" min="0" oninput="updateEditPreview()">
+            </div>
+            <div class="edit-field-group">
+                <label>Hearing (mins)</label>
+                <input type="number" id="edit-hearing-mins" min="0" oninput="updateEditPreview()">
+            </div>
+            <div class="edit-field-group">
+                <label>Service / Seva (mins)</label>
+                <input type="number" id="edit-service-mins" min="0" oninput="updateEditPreview()">
+            </div>
+            <div class="edit-field-group" id="edit-notes-row">
+                <label>Notes Revision (mins)</label>
+                <input type="number" id="edit-notes-mins" min="0" oninput="updateEditPreview()">
+            </div>
+        </div>
+
+        <!-- Live score preview -->
+        <div class="edit-score-preview" id="edit-score-preview">Score will appear here</div>
+
+        <!-- Move to different date -->
+        <div style="margin:12px 0;padding:10px 14px;background:#eff6ff;border-radius:var(--r-md);border:1px solid #bfdbfe;">
+            <label style="font-weight:600;font-size:13px;color:var(--primary);display:flex;align-items:center;gap:6px;margin:0 0 6px;">
+                <input type="checkbox" id="edit-change-date-toggle" onchange="document.getElementById('edit-new-date').style.display=this.checked?'':'none';" style="width:auto;margin:0;">
+                Move this entry to a different date
+            </label>
+            <input type="date" id="edit-new-date" style="display:none;margin:0;" min="2026-02-12">
+        </div>
+
+        <!-- Reason for edit -->
+        <div class="edit-reason-group">
+            <label>Reason for Edit <span style="color:#aaa;font-weight:400;">(optional but recommended)</span></label>
+            <textarea id="edit-reason" placeholder="e.g. User entered 11:00 instead of 23:00 for bed time"></textarea>
+        </div>
+
+        <button onclick="submitEditSadhana()" class="btn-warning" style="margin-top:4px;">
+            💾 Save Changes
+        </button>
+        <button onclick="closeEditModal()" class="btn-gray">Cancel</button>
+    </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════ -->
+<!-- MODAL: Edit History Viewer                             -->
+<!-- ══════════════════════════════════════════════════════ -->
+<div id="edit-history-modal" class="modal-overlay hidden">
+    <div class="modal-box md">
+        <button class="modal-close" onclick="closeEditHistoryModal()">×</button>
+        <div class="modal-title">✏️ Edit History</div>
+        <div id="edit-history-content"></div>
+        <button onclick="closeEditHistoryModal()" class="btn-gray" style="margin-top:12px;">Close</button>
+    </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════ -->
+<!-- MODAL: Reject / Revoke Entry                          -->
+<!-- ══════════════════════════════════════════════════════ -->
+<div id="reject-modal" class="modal-overlay hidden">
+    <div class="modal-box sm">
+        <button class="modal-close" onclick="closeRejectModal()">×</button>
+        <div class="modal-title" id="reject-modal-title">🚫 Reject Entry</div>
+        <div id="reject-modal-body" style="margin-bottom:14px;"></div>
+        <div>
+            <label style="font-size:13px;font-weight:600;color:#555;">Remarks <span style="font-weight:400;color:#aaa;">(optional)</span></label>
+            <textarea id="reject-remarks" placeholder="Add a reason..." style="width:100%;margin-top:6px;padding:10px;border-radius:8px;border:1px solid #ddd;font-size:13px;resize:vertical;min-height:72px;box-sizing:border-box;"></textarea>
+        </div>
+        <div style="display:flex;gap:10px;margin-top:16px;">
+            <button id="reject-confirm-btn" class="btn-primary" style="flex:1;" onclick="submitRejectAction()">Confirm</button>
+            <button onclick="closeRejectModal()" class="btn-gray" style="flex:1;">Cancel</button>
+        </div>
+    </div>
+</div>
+
+<!-- ══ MODAL: Notifications Panel ══ -->
+<div id="notifications-modal" class="modal-overlay hidden">
+    <div class="modal-box sm">
+        <button class="modal-close" onclick="closeNotificationsPanel()">×</button>
+        <div class="modal-title">🔔 Notifications</div>
+        <div id="notifications-list" style="min-height:80px;">
+            <p style="color:var(--muted);text-align:center;font-size:13px;padding:20px 0;">No new notifications</p>
+        </div>
+        <div style="margin-top:14px;">
+            <button onclick="requestNotificationPermission()" class="btn-primary btn-sm" style="width:100%;padding:10px;">
+                Enable Push Notifications
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- ══ MODAL: User Guide ══ -->
+<div id="user-guide-modal" class="modal-overlay hidden">
+    <div class="modal-box md">
+        <button class="modal-close" onclick="document.getElementById('user-guide-modal').classList.add('hidden')">×</button>
+        <div class="modal-title">📖 How to Use Sadhna Tracker</div>
+        <div style="overflow-y:auto;max-height:70vh;">
+
+            <div class="guide-section">
+                <h3>🏠 What is this App?</h3>
+                <div class="guide-row"><span class="guide-icon">📿</span><span>This app helps you track your daily spiritual practices (Sadhna) — like chanting, reading, hearing, and service. Your coordinator can see your progress and guide you better.</span></div>
+            </div>
+
+            <div class="guide-section">
+                <h3>📝 How to Fill Daily Entry</h3>
+                <div class="guide-row"><span class="guide-icon">1️⃣</span><span>Tap <b>Daily Entry</b> tab at the top.</span></div>
+                <div class="guide-row"><span class="guide-icon">2️⃣</span><span>Select today's date from the dropdown.</span></div>
+                <div class="guide-row"><span class="guide-icon">3️⃣</span><span>Fill in what time you slept last night, woke up, and completed chanting.</span></div>
+                <div class="guide-row"><span class="guide-icon">4️⃣</span><span>Enter minutes spent in Reading, Hearing, and Service.</span></div>
+                <div class="guide-row"><span class="guide-icon">5️⃣</span><span>Tap <b>Submit Sadhna</b>. Done! ✅</span></div>
+                <div class="guide-row"><span class="guide-icon">⚠️</span><span>You can only submit once per day. Fill it every day for best results.</span></div>
+            </div>
+
+            <div class="guide-section">
+                <h3>📊 Scoring System — How are marks given?</h3>
+                <p style="font-size:12px;color:var(--muted);margin-bottom:8px;">Each day maximum score is <b>160 points</b>. Each week maximum is <b>1120 points</b>.</p>
+                <table class="score-table">
+                    <tr><th>Activity</th><th>Good Score</th><th>Bad Score</th></tr>
+                    <tr><td>🛌 Bed Time (before 11 PM)</td><td class="score-pos">+20</td><td class="score-neg">-5</td></tr>
+                    <tr><td>⏰ Wake Up (before 5 AM)</td><td class="score-pos">+20</td><td class="score-neg">-5</td></tr>
+                    <tr><td>📿 Chanting (before 8 AM)</td><td class="score-pos">+20</td><td class="score-neg">-5</td></tr>
+                    <tr><td>📖 Reading (Pathan) 30+ mins</td><td class="score-pos">+20</td><td class="score-neg">-5 to 0</td></tr>
+                    <tr><td>🎧 Hearing (Shravan) 30+ mins</td><td class="score-pos">+20</td><td class="score-neg">-5 to 0</td></tr>
+                    <tr><td>🛠️ Service (Seva) 30+ mins</td><td class="score-pos">+20</td><td class="score-neg">-5 to 0</td></tr>
+                    <tr><td>😴 Day Sleep (less is better)</td><td class="score-pos">0</td><td class="score-neg">up to -20</td></tr>
+                    <tr><td>❌ Not Reported (NR) — missed day</td><td colspan="2" class="score-neg" style="text-align:center;">-35 (penalty)</td></tr>
+                </table>
+                <p style="font-size:11px;color:var(--muted);margin-top:8px;">* Times shown are guidelines — exact cutoffs are set by your coordinator.</p>
+            </div>
+
+            <div class="guide-section">
+                <h3>📈 My Reports</h3>
+                <div class="guide-row"><span class="guide-icon">📅</span><span>Shows your last 4 weeks. Each week shows daily scores, totals, and percentage.</span></div>
+                <div class="guide-row"><span class="guide-icon">💚</span><span>Green % = good week. <span style="color:#d97706;">Orange</span> = needs improvement. <span style="color:#dc2626;">Red</span> = missed many days.</span></div>
+                <div class="guide-row"><span class="guide-icon">📥</span><span>Download your full history as Excel file anytime.</span></div>
+            </div>
+
+            <div class="guide-section">
+                <h3>📉 My Progress</h3>
+                <div class="guide-row"><span class="guide-icon">📊</span><span>See your score trend as a chart — Daily, Weekly, or Monthly view.</span></div>
+            </div>
+
+            <div class="guide-section">
+                <h3>🔔 Notifications</h3>
+                <div class="guide-row"><span class="guide-icon">🔔</span><span>Tap the bell in the menu → Allow → You will get reminders if you forget to fill Sadhna for 2+ days.</span></div>
+            </div>
+
+            <div class="guide-section">
+                <h3>❓ Common Questions</h3>
+                <div class="guide-row"><span class="guide-icon">Q</span><span><b>Can I fill yesterday's entry?</b> Yes, select yesterday's date from the dropdown.</span></div>
+                <div class="guide-row"><span class="guide-icon">Q</span><span><b>I made a mistake. Can I edit?</b> Only your coordinator/admin can edit submitted entries.</span></div>
+                <div class="guide-row"><span class="guide-icon">Q</span><span><b>What if I forget for many days?</b> Those days show as NR (Not Reported) with -35 penalty each.</span></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ══ MODAL: About ══ -->
+<div id="about-modal" class="modal-overlay hidden">
+    <div class="modal-box sm">
+        <button class="modal-close" onclick="document.getElementById('about-modal').classList.add('hidden')">×</button>
+        <div class="modal-title">ℹ️ About</div>
+        <div style="text-align:center;padding:10px 0 20px;">
+            <img src="" style="width:72px;height:72px;border-radius:50%;margin-bottom:12px;">
+            <div style="font-size:18px;font-weight:700;color:#1A3C5E;margin-bottom:4px;">Krishna Parayan</div>
+            <div style="font-size:13px;color:var(--muted);margin-bottom:16px;font-style:italic;">Let's Move to Supreme Lord</div>
+            <div style="font-size:13px;color:#444;line-height:1.7;text-align:left;background:#f9fafb;padding:14px;border-radius:10px;">
+                <b>Sadhna Tracker</b> is a tool built to help devotees track their daily spiritual practices and stay accountable to their Sadhna routine.<br><br>
+                Built with love and dedication for the Krishna Parayan community. 🙏<br><br>
+                <span style="color:var(--muted);font-size:12px;">For support, contact your category coordinator.</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// ── Password eye toggle ──
+window.togglePwd = (inputId, btn) => {
+    const inp = document.getElementById(inputId);
+    if (!inp) return;
+    const show = inp.type === 'password';
+    inp.type = show ? 'text' : 'password';
+    btn.textContent = show ? '🙈' : '👁️';
+};
+</script>
+<script src="app.js"></script>
+
+<!-- ── User Action Bottom Sheet ── -->
+<div id="uac-overlay" class="uac-overlay hidden" onclick="closeUAC()"></div>
+<div id="uac-sheet" class="uac-sheet">
+    <div class="uac-handle"></div>
+    <div class="uac-head">
+        <div>
+            <div class="uac-hname" id="uac-name">—</div>
+            <div class="uac-hsub"  id="uac-sub">—</div>
+        </div>
+        <button class="uac-x" onclick="closeUAC()">&#10005;</button>
+    </div>
+    <div class="uac-body">
+        <button class="uac-btn" onclick="uacHistory()">
+            <div class="uac-ico" style="background:#dbeafe;">📋</div><span>View History</span>
+        </button>
+        <button class="uac-btn" onclick="uacExcel()">
+            <div class="uac-ico" style="background:#dcfce7;">📥</div><span>Download Excel</span>
+        </button>
+        <button class="uac-btn" onclick="uacProgress()">
+            <div class="uac-ico" style="background:#ede9fe;">📈</div><span>View Progress</span>
+        </button>
+        <div id="uac-activity-wrap">
+            <button class="uac-btn" onclick="uacActivity()">
+                <div class="uac-ico" style="background:#fef3c7;">📊</div><span>Activity Analysis</span>
+            </button>
+        </div>
+        <div id="uac-role-wrap" class="uac-fullwidth">
+            <hr class="uac-divider">
+            <div class="uac-role-label">Change Role</div>
+            <select id="uac-role-sel" class="uac-role-sel" onchange="uacRoleChange(this)">
+                <option value="" disabled selected>Select&#8230;</option>
+            </select>
+        </div>
+        <button class="uac-btn danger uac-fullwidth" onclick="uacRemove()">
+            <div class="uac-ico" style="background:#fee2e2;">🗑️</div><span>Remove User</span>
+        </button>
+    </div>
+</div>
+<!-- ── Activity Analysis Modal ── -->
+<div id="aa-modal" class="modal-overlay hidden" onclick="if(event.target===this)closeActivityModal()">
+    <div class="modal-box" style="max-width:520px;padding:0;border-radius:16px;overflow:hidden;">
+        <!-- Header -->
+        <div style="background:linear-gradient(135deg,#1A3C5E,#2563a0);padding:18px 20px 14px;display:flex;align-items:center;justify-content:space-between;">
+            <div>
+                <div style="color:white;font-size:15px;font-weight:700;">&#128202; Activity Analysis</div>
+                <div id="aa-user-name" style="color:#93c5fd;font-size:13px;margin-top:2px;">—</div>
+            </div>
+            <button onclick="closeActivityModal()" style="width:32px;height:32px;background:rgba(255,255,255,0.15);border:none;border-radius:50%;color:white;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;margin:0;">&#10005;</button>
+        </div>
+        <!-- Tabs -->
+        <div class="chart-tabs" style="margin:14px 20px 0;">
+            <button class="chart-tab-btn aa-tab-btn active" onclick="setAATab('current-week',this)">This Week</button>
+            <button class="chart-tab-btn aa-tab-btn"        onclick="setAATab('prev-week',this)">Last Week</button>
+        </div>
+        <!-- Period label + status -->
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 20px 0;">
+            <div id="aa-period-label" style="font-size:12px;color:#6b7280;"></div>
+            <div id="aa-status"       style="font-size:12px;color:#6b7280;"></div>
+        </div>
+        <!-- Charts -->
+        <div style="display:flex;flex-direction:column;gap:16px;padding:16px 20px 20px;">
+            <!-- Donut: overall average % -->
+            <div style="display:flex;align-items:center;gap:20px;">
+                <div class="aa-donut-wrap" id="aa-donut-wrap">
+                    <canvas id="aa-donut-canvas"></canvas>
+                </div>
+                <div style="flex:1;">
+                    <div style="font-size:13px;font-weight:700;color:#1A3C5E;margin-bottom:4px;">Weekly Score %</div>
+                    <div style="font-size:12px;color:#6b7280;line-height:1.6;">
+                        Total marks earned ÷ max possible for submitted days (same as WCR).
+                        <br><span style="color:#16a34a;font-weight:600;">&#8805;70%</span> Good &nbsp;
+                        <span style="color:#d97706;font-weight:600;">50–69%</span> OK &nbsp;
+                        <span style="color:#dc2626;font-weight:600;">&lt;50%</span> Needs work
+                    </div>
+                </div>
+            </div>
+            <!-- Bar: per-activity breakdown -->
+            <div>
+                <div style="font-size:13px;font-weight:700;color:#1A3C5E;margin-bottom:8px;">Activity Breakdown (total pts this week)</div>
+                <div class="aa-bar-wrap" id="aa-bar-wrap">
+                    <canvas id="aa-bar-canvas"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ── USER BOTTOM NAV ── -->
+<nav id="user-bottom-nav" class="bottom-nav">
+    <button class="bnav-item active" onclick="switchTab('home')">
+        <span class="bnav-icon">🏠</span><span>Home</span>
+    </button>
+    <button class="bnav-item" onclick="switchTab('mysadhana')">
+        <span class="bnav-icon">🧘</span><span>Sadhna</span>
+    </button>
+    <button class="bnav-item" onclick="switchTab('team')">
+        <span class="bnav-icon">🏆</span><span>Team</span>
+    </button>
+    <button class="bnav-item" id="bnav-manage" style="display:none;" onclick="switchTab('manage')">
+        <span class="bnav-icon">⚙️</span><span>Manage</span>
+    </button>
+</nav>
+
+<!-- ── SA BOTTOM NAV ── -->
+<nav id="sa-bottom-nav" class="bottom-nav">
+    <button class="bnav-item active" onclick="saBnavTab('home')">
+        <span class="bnav-icon">🏠</span><span>Home</span>
+    </button>
+    <button class="bnav-item" onclick="saBnavTab('reports')">
+        <span class="bnav-icon">📊</span><span>WCR</span>
+    </button>
+    <button class="bnav-item" onclick="saBnavTab('usermgmt')">
+        <span class="bnav-icon">👥</span><span>Devotees</span>
+    </button>
+    <button class="bnav-item" onclick="saBnavTab('inactive')">
+        <span class="bnav-icon">⚠️</span><span>Inactive</span>
+    </button>
+    <button class="bnav-item" onclick="saBnavTab('leaderboard')">
+        <span class="bnav-icon">🏆</span><span>Rankings</span>
+    </button>
+    <button class="bnav-item" onclick="saBnavTab('tasks')">
+        <span class="bnav-icon">📋</span><span>Tasks</span>
+    </button>
+</nav>
+
+<!-- ── SUBMIT SUCCESS OVERLAY ── -->
+<div id="submit-success-overlay">
+    <div class="submit-success-card">
+        <div class="success-icon">🙏</div>
+        <div class="success-score" id="ss-score">--</div>
+        <div class="success-label">out of 160 pts</div>
+        <div class="success-bar-wrap"><div class="success-bar-fill" id="ss-bar"></div></div>
+        <div id="ss-pct">--%</div>
+        <div class="success-msg" id="ss-msg"></div>
+    </div>
+</div>
+<!-- ── PWA INSTALL BANNER ── -->
+<style>
+#pwa-install-banner{display:none;position:fixed;bottom:0;left:0;right:0;z-index:9999;background:#1A3C5E;color:#fff;padding:10px 14px;box-shadow:0 -2px 12px rgba(0,0,0,.25)}
+#pwa-install-banner .pwa-row{display:flex;align-items:center;gap:10px;max-width:600px;margin:0 auto}
+#pwa-install-banner .pwa-icon{width:36px;height:36px;border-radius:8px;flex-shrink:0}
+#pwa-install-banner .pwa-text{flex:1;min-width:0;line-height:1.3}
+#pwa-install-banner .pwa-title{font-size:13px;font-weight:700}
+#pwa-install-banner .pwa-sub{font-size:10px;opacity:.75}
+#pwa-install-banner button{width:auto!important;margin:0!important;flex-shrink:0}
+#pwa-install-banner .pwa-btn{background:#e74c3c;color:#fff;border:none;padding:7px 16px;border-radius:18px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap}
+#pwa-install-banner .pwa-close{background:none;border:none;color:#fff;font-size:20px;cursor:pointer;padding:0 4px;opacity:.7;line-height:1}
+</style>
+<div id="pwa-install-banner">
+    <div class="pwa-row">
+        <img class="pwa-icon" src="icon-192.png" alt="">
+        <div class="pwa-text">
+            <div class="pwa-title">Install Sadhana Tracker</div>
+            <div class="pwa-sub">Add to home screen for quick access</div>
+        </div>
+        <button class="pwa-btn" id="pwa-install-btn">Install</button>
+        <button class="pwa-close" id="pwa-install-close">&times;</button>
+    </div>
+</div>
+<script>
+(function() {
+    let _deferredPrompt = null;
+    const banner = document.getElementById('pwa-install-banner');
+    const installBtn = document.getElementById('pwa-install-btn');
+    const closeBtn = document.getElementById('pwa-install-close');
+
+    // Don't show if already installed (standalone mode)
+    const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
+
+    // Dismiss expires after 7 days
+    function isDismissed() {
+        const ts = localStorage.getItem('pwa-install-dismissed');
+        if (!ts) return false;
+        return (Date.now() - Number(ts)) < 7 * 24 * 60 * 60 * 1000;
+    }
+
+    function showBanner() {
+        if (!isStandalone && !isDismissed()) banner.style.display = 'block';
+    }
+
+    window.addEventListener('beforeinstallprompt', (e) => {
+        e.preventDefault();
+        _deferredPrompt = e;
+        showBanner();
+    });
+
+    installBtn.addEventListener('click', async () => {
+        if (!_deferredPrompt) return;
+        _deferredPrompt.prompt();
+        const result = await _deferredPrompt.userChoice;
+        if (result.outcome === 'accepted') {
+            banner.style.display = 'none';
+        }
+        _deferredPrompt = null;
+    });
+
+    closeBtn.addEventListener('click', () => {
+        banner.style.display = 'none';
+        localStorage.setItem('pwa-install-dismissed', String(Date.now()));
+    });
+
+    // Hide banner if app gets installed
+    window.addEventListener('appinstalled', () => {
+        banner.style.display = 'none';
+        _deferredPrompt = null;
+    });
+})();
+</script>
+</body>
+</html>
